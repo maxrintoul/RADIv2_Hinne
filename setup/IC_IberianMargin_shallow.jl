@@ -6,7 +6,7 @@ dz_top=0.2e-3 # depth resolution at top of sediment
 dz_bot=5e-2 # depth resolution at bottom of sediment
 Nz=51  # number of depth layers
 
-tspan = (0.0, 2000.0) # in years
+tspan = (0.0, 10.0) # in years
 
 # +
 # wave
@@ -84,5 +84,8 @@ pMnO2_i = 0.0
 pcalcite_i = 4.5e3
 paragonite_i = 0.0
 pclay_i = 1.0e3
+
+# Define dissolution scheme for CaCO3 (1 = base RADI, 2 = temp dependent dissolution)
+diss_scheme = 2
 
 
