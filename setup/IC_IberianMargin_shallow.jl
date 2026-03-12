@@ -88,4 +88,6 @@ pclay_i = 1.0e3
 # Define dissolution scheme for CaCO3 (1 = base RADI, 2 = temp dependent dissolution)
 diss_scheme = 2
 
-
+# Define Q10 for secondary reactions
+Q10_secondary = 3.8 # typical value for biological reactions
+Tref = 9.0 # reference temperature for Q10 / °C

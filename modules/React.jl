@@ -23,7 +23,7 @@ const ETCH_PIT_RATE_CONSTANT = 7.891e-11
 const DEFECT_ASSISTED_RATE_CONSTANT = 6.504e-13
 const TRANSITION_OMEGA = 0.9
 const LOW_TEMP_THRESHOLD = 5.0
-const TIME_SA_CONVERSION = 4e6 *60^2 *24 *365 /4.709197671429600e+02
+const TIME_SA_CONVERSION = 4e6 *60^2 *24 *365 /4.709197671429600e+02 # Is this necessary when using the solver?
 
 # Monod scheme inhibition factors
 inhibition_dO2(dO2::Float64)      = KMi_dO2   / (KMi_dO2   + dO2)
@@ -151,16 +151,19 @@ function redox(
     dMnII::Float64,
     dCH4::Float64,
     dtSO4::Float64,
+    Q10_secondary::Float64,
+    T::Float64,
+    Tref::Float64
 )
     rO2 = monod(dO2, K_O2)
 
-    R_NH3_redox   = VMAX_NH3     * monod(dtNH4, K_NH4) * rO2
-    R_H2S_redox   = VMAX_H2S     * monod(dtH2S, K_H2S) * rO2
-    R_FeII_redox  = VMAX_Fe      * monod(dFeII, K_Fe ) * rO2
-    R_MnII_redox  = VMAX_Mn      * monod(dMnII, K_Mn ) * rO2
+    R_NH3_redox   = VMAX_NH3     * monod(dtNH4, K_NH4) * rO2  * Q10_secondary^((T - Tref)/10)
+    R_H2S_redox   = VMAX_H2S     * monod(dtH2S, K_H2S) * rO2  * Q10_secondary^((T - Tref)/10)
+    R_FeII_redox  = VMAX_Fe      * monod(dFeII, K_Fe ) * rO2  * Q10_secondary^((T - Tref)/10)
+    R_MnII_redox  = VMAX_Mn      * monod(dMnII, K_Mn ) * rO2  * Q10_secondary^((T - Tref)/10)
 
-    R_CH4_O2redox  = VMAX_CH4_O2  * monod(dCH4, K_CH4) * rO2
-    R_CH4_SO4redox = VMAX_CH4_SO4 * monod(dCH4, K_CH4) * monod(dtSO4, K_SO4)
+    R_CH4_O2redox  = VMAX_CH4_O2  * monod(dCH4, K_CH4) * rO2  * Q10_secondary^((T - Tref)/10)
+    R_CH4_SO4redox = VMAX_CH4_SO4 * monod(dCH4, K_CH4) * monod(dtSO4, K_SO4) * Q10_secondary^((T - Tref)/10)
 
     return R_MnII_redox, R_FeII_redox, R_NH3_redox, R_H2S_redox, R_CH4_O2redox, R_CH4_SO4redox
 end
@@ -261,7 +264,7 @@ function getreactions(
     dO2::Float64, dtNO3::Float64, pMnO2::Float64, pFeOH3::Float64, dtSO4::Float64,
     dtNH4::Float64, dtH2S::Float64, dFeII::Float64, dMnII::Float64, dCH4::Float64,
     pfoc_kfast::Float64, psoc_kslow::Float64,
-    pcalcite::Float64, paragonite::Float64, dCa::Float64, dCO3::Float64, KCa::Float64, KAr::Float64, T::Float64, diss_scheme::Integer,
+    pcalcite::Float64, paragonite::Float64, dCa::Float64, dCO3::Float64, KCa::Float64, KAr::Float64, T::Float64, diss_scheme::Integer, Q10_secondary::Float64, Tref::Float64
 )
     Rfast_dO2, Rslow_dO2, Rfast_dtNO3, Rslow_dtNO3, Rfast_pMnO2, Rslow_pMnO2,
     Rfast_pFeOH3, Rslow_pFeOH3, Rfast_dtSO4, Rslow_dtSO4, Rfast_dCH4, Rslow_dCH4,
@@ -270,7 +273,7 @@ function getreactions(
 
     # Monod-limited redox
     R_dMnII, R_dFeII, R_dNH3, R_dH2S, R_CH4_O2redox, R_CH4_SO4redox =
-        redox(dO2, dtNH4, dtH2S, dFeII, dMnII, dCH4, dtSO4)
+        redox(dO2, dtNH4, dtH2S, dFeII, dMnII, dCH4, dtSO4, Q10_secondary, T, Tref)
 
     Rdiss_calcite, Rdiss_aragonite, Rprec_calcite, Rprec_aragonite =
         dissolve_precipitate_CaCO3(pcalcite, paragonite, dCa, dCO3, KCa, KAr, T, diss_scheme)
@@ -358,7 +361,7 @@ end
 function rates(
     dO2, dtNO3, pMnO2, pFeOH3, dtSO4, dtNH4, dtH2S, dFeII, dMnII, dCH4,
     pfoc_kfast, psoc_kslow, pcalcite, paragonite, dCa, dCO3, KCa, KAr,
-    phiS_phi_z, RC, RN, RP, T, diss_scheme,
+    phiS_phi_z, RC, RN, RP, T, diss_scheme, Q10_secondary, Tref
 )
     (Rfast_dO2, Rslow_dO2, Rfast_dtNO3, Rslow_dtNO3,
      Rfast_pMnO2, Rslow_pMnO2, Rfast_pFeOH3, Rslow_pFeOH3,
@@ -367,7 +370,7 @@ function rates(
      R_dMnII, R_dFeII, R_dNH3, R_dH2S, R_dCH4_O2redox, R_dCH4_SO4redox,
      Rdiss_calcite, Rdiss_aragonite, Rprec_calcite, Rprec_aragonite) =
         getreactions(dO2, dtNO3, pMnO2, pFeOH3, dtSO4, dtNH4, dtH2S, dFeII, dMnII, dCH4,
-                     pfoc_kfast, psoc_kslow, pcalcite, paragonite, dCa, dCO3, KCa, KAr, T, diss_scheme)
+                     pfoc_kfast, psoc_kslow, pcalcite, paragonite, dCa, dCO3, KCa, KAr, T, diss_scheme, Q10_secondary, Tref)
 
     return reactions2rates(Rfast_dO2, Rslow_dO2, Rfast_dtNO3, Rslow_dtNO3,
                            Rfast_pMnO2, Rslow_pMnO2, Rfast_pFeOH3, Rslow_pFeOH3,
