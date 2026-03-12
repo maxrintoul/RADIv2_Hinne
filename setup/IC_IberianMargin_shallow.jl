@@ -89,5 +89,6 @@ pclay_i = 1.0e3
 diss_scheme = 2
 
 # Define Q10 for secondary reactions
-Q10_secondary = 3.8 # typical value for biological reactions
-Tref = 9.0 # reference temperature for Q10 / °C
+Q10_primary = 2.0 # typical value for biological processes - Fossing et al. (2004)
+Q10_secondary = 3.8 # typical value for biological reactions - Fossing et al. (2004)
+Tref = 9.0 # reference temperature for Q10 / °C - Fossing et al. (2004)
