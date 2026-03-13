@@ -64,7 +64,8 @@ Faragonite = 0.0  # flux of aragonite to the seafloor / mol/m^2/a
 Fclay = (2.0 / 360.31)*300# flux of clay (montmorillonite) to the seafloor / mol/m^2/ to match sedimemtation rate of (Epping et al., 2002)
 FFeS = 0.0 # flux of FeS to the seafloor / mol/m^2/a
 FFeS2 = 0.0 # flux of FeS2 to the seafloor / mol/m^2/a
-FS0 = 0.5 # flux of elemental sulfur to the seafloor / mol/m^2/a
+FS0 = 0.0 # flux of elemental sulfur to the seafloor / mol/m^2/a
+FFeOH3_PO4 = 0.5 # flux of Fe(OH)3-PO4 to the seafloor / mol/m^2/a
 rho_p = 2.65e6  # average density of all solid matter / g/m^3
 
 # Define initial conditions within the sediment (scalars or arrays)
@@ -90,6 +91,7 @@ pclay_i = 1.0e3
 pFeS_i = 0.0
 pFeS2_i = 0.0
 pS0_i = 0.0
+pFeOH3_PO4_i = 0.0
 
 
 # Define dissolution scheme for CaCO3 (1 = base RADI, 2 = temp dependent dissolution)
