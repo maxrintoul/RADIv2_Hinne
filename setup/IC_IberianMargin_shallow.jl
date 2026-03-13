@@ -62,6 +62,7 @@ FFeOH3 = 0.10 * (365.25/1000)# North Sea flux from (Slomp et al., 1996) converte
 Fcalcite = 0.22  # flux of calcite to the seafloor / mol/m^2/a
 Faragonite = 0.0  # flux of aragonite to the seafloor / mol/m^2/a
 Fclay = (2.0 / 360.31)*300# flux of clay (montmorillonite) to the seafloor / mol/m^2/ to match sedimemtation rate of (Epping et al., 2002)
+FFeS = 0.0 # flux of FeS to the seafloor / mol/m^2/a
 rho_p = 2.65e6  # average density of all solid matter / g/m^3
 
 # Define initial conditions within the sediment (scalars or arrays)
@@ -84,6 +85,7 @@ pMnO2_i = 0.0
 pcalcite_i = 4.5e3
 paragonite_i = 0.0
 pclay_i = 1.0e3
+pFeS_i = 0.0
 
 # Define dissolution scheme for CaCO3 (1 = base RADI, 2 = temp dependent dissolution)
 diss_scheme = 2
