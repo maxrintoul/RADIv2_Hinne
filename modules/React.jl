@@ -220,10 +220,11 @@ function redox(
     R_FeS2_SO4_H2S_FeS = VMAX_FeS2_SO4_H2S_FeS * monod(pFeS, CREF_FeS) * Q10_secondary^((T - Tref)/10)
     R_FeS_ox = VMAX_FeS_ox * monod(pFeS, CREF_FeS) * monod(dO2, K_O2) * Q10_secondary^((T - Tref)/10)
     R_FeS2_O2 = VMAX_FeS2_O2 * monod(pFeS2, CREF_FeS2) * monod(dO2, K_O2) * Q10_secondary^((T - Tref)/10)
+    R_S0_H20 = VMAX_S0_H20 * monod(pS0, CREF_S0) * Q10_secondary^((T - Tref)/10)
 
     return R_MnII_redox, R_FeII_redox, R_NH3_redox, R_H2S_redox, R_CH4_O2redox, R_CH4_SO4redox, R_FEOH3_PO4_adsorp, 
         R_Fe_MnO2_red, R_H2S_FeOOH_PO4_red, R_H2S_FeOOH_red, R_H2S_MnO2_red, R_FeS_H2S_Fe, R_FeS2_FeS_S0, 
-        R_FeS2_SO4_H2S_FeS, R_FeS_ox, R_FeS2_O2
+        R_FeS2_SO4_H2S_FeS, R_FeS_ox, R_FeS2_O2, R_S0_H20
 end
 
 # =========================
@@ -332,7 +333,7 @@ function getreactions(
 
     # Monod-limited redox
     R_dMnII, R_dFeII, R_dNH3, R_dH2S, R_CH4_O2redox, R_CH4_SO4redox, R_FEOH3_PO4_adsorp, R_Fe_MnO2_red, 
-    R_H2S_FeOOH_PO4_red, R_H2S_FeOOH_red, R_H2S_MnO2_red, R_FeS_H2S_Fe, R_FeS2_FeS_S0, R_FeS2_SO4_H2S_FeS, R_FeS_ox, R_FeS2_O2 =
+    R_H2S_FeOOH_PO4_red, R_H2S_FeOOH_red, R_H2S_MnO2_red, R_FeS_H2S_Fe, R_FeS2_FeS_S0, R_FeS2_SO4_H2S_FeS, R_FeS_ox, R_FeS2_O2, R_S0_H20 =
         redox(dO2, dtNH4, dtH2S, dFeII, dMnII, dCH4, dtSO4, pFeOH3, pMnO2, dtPO4, pFeOH3_PO4, pFeS, pS0, pFeS2, Q10_secondary, T, Tref)
 
     Rdiss_calcite, Rdiss_aragonite, Rprec_calcite, Rprec_aragonite =
@@ -344,7 +345,7 @@ function getreactions(
             Rfast_total, Rslow_total,
             R_dMnII, R_dFeII, R_dNH3, R_dH2S, R_CH4_O2redox, R_CH4_SO4redox, R_FEOH3_PO4_adsorp, 
             R_Fe_MnO2_red, R_H2S_FeOOH_PO4_red, R_H2S_FeOOH_red, R_H2S_MnO2_red, R_FeS_H2S_Fe, 
-            R_FeS2_FeS_S0, R_FeS2_SO4_H2S_FeS, R_FeS_ox, R_FeS2_O2,
+            R_FeS2_FeS_S0, R_FeS2_SO4_H2S_FeS, R_FeS_ox, R_FeS2_O2, R_S0_H20,
             Rdiss_calcite, Rdiss_aragonite, Rprec_calcite, Rprec_aragonite)
 end
 
@@ -361,7 +362,7 @@ function reactions2rates(
     R_CH4_O2redox::Float64, R_CH4_SO4redox::Float64,
     R_FEOH3_PO4_adsorp::Float64, R_Fe_MnO2_red::Float64, R_H2S_FeOOH_PO4_red::Float64,
     R_H2S_FeOOH_red::Float64, R_H2S_MnO2_red::Float64, R_FeS_H2S_Fe::Float64, 
-    R_FeS2_FeS_S0::Float64, R_FeS2_SO4_H2S_FeS::Float64, R_FeS_ox::Float64, R_FeS2_O2::Float64,
+    R_FeS2_FeS_S0::Float64, R_FeS2_SO4_H2S_FeS::Float64, R_FeS_ox::Float64, R_FeS2_O2::Float64, R_S0_H20::Float64,
     Rdiss_calcite::Float64, Rdiss_aragonite::Float64,
     Rprec_calcite::Float64, Rprec_aragonite::Float64,
     phiS_phi_z::Float64, RC::Float64, RN::Float64, RP::Float64,
@@ -389,11 +390,11 @@ function reactions2rates(
     rate_dtCO2 = p2d * (RC*(Rdeg_total - 0.5*Rdeg_dCH4) + Rdiss_CaCO3) +
                  R_CH4_O2redox + R_CH4_SO4redox
     rate_dtNO3 = p2d * RC * (-0.8*Rdeg_dtNO3) + R_dNH3
-    rate_dtSO4 = p2d * RC * (-0.5*Rdeg_dtSO4) + R_dH2S - R_CH4_SO4redox - p2d * R_FeS2_SO4_H2S_FeS + p2d * R_FeS_ox + 4.0 * p2d * R_FeS2_O2
+    rate_dtSO4 = p2d * RC * (-0.5*Rdeg_dtSO4) + R_dH2S - R_CH4_SO4redox - p2d * R_FeS2_SO4_H2S_FeS + p2d * R_FeS_ox + 4.0 * p2d * R_FeS2_O2 + p2d * R_S0_H20
     rate_dCH4  = p2d * RC * (0.5*Rdeg_dCH4) - R_CH4_O2redox - R_CH4_SO4redox
     rate_dtPO4 = p2d * RP * Rdeg_total - p2d * R_FEOH3_PO4_adsorp + 2.0 * p2d * R_H2S_FeOOH_PO4_red
     rate_dtNH4 = p2d * RN * Rdeg_total - R_dNH3
-    rate_dtH2S = p2d * RC * (0.5*Rdeg_dtSO4) - R_dH2S + R_CH4_SO4redox - p2d * R_H2S_FeOOH_PO4_red - p2d * R_H2S_FeOOH_red - p2d * R_H2S_MnO2_red - R_FeS_H2S_Fe - 3.0 * p2d * R_FeS2_SO4_H2S_FeS
+    rate_dtH2S = p2d * RC * (0.5*Rdeg_dtSO4) - R_dH2S + R_CH4_SO4redox - p2d * R_H2S_FeOOH_PO4_red - p2d * R_H2S_FeOOH_red - p2d * R_H2S_MnO2_red - R_FeS_H2S_Fe - 3.0 * p2d * R_FeS2_SO4_H2S_FeS + 3.0 * p2d * R_S0_H20
     rate_dFeII = p2d * RC * (4.0*Rdeg_pFeOH3) - R_dFeII - 2.0 * p2d * R_Fe_MnO2_red + 2.0 * p2d * R_H2S_FeOOH_PO4_red + 2.0 * p2d * R_H2S_FeOOH_red - R_FeS_H2S_Fe + p2d * R_FeS_ox + 2.0 * p2d * R_FeS2_O2
     rate_dMnII = p2d * RC * (2.0*Rdeg_pMnO2) - R_dMnII + p2d * R_Fe_MnO2_red + p2d * R_H2S_MnO2_red
     rate_pfoc  = -Rfast_total
@@ -401,7 +402,7 @@ function reactions2rates(
     rate_pFeOH3= RC * (-4.0*Rdeg_pFeOH3) + d2p * R_dFeII - R_FEOH3_PO4_adsorp - 2.0 * R_H2S_FeOOH_red
     rate_pMnO2 = RC * (-2.0*Rdeg_pMnO2) + d2p * R_dMnII - R_Fe_MnO2_red - R_H2S_MnO2_red
     rate_pFeOH3_PO4 = R_FEOH3_PO4_adsorp - 2 * R_H2S_FeOOH_PO4_red
-    rate_S0 = R_H2S_FeOOH_PO4_red + R_H2S_FeOOH_red + R_H2S_MnO2_red - R_FeS2_FeS_S0
+    rate_S0 = R_H2S_FeOOH_PO4_red + R_H2S_FeOOH_red + R_H2S_MnO2_red - R_FeS2_FeS_S0 - 4.0 * R_S0_H20
     rate_pFeS = d2p * R_FeS_H2S_Fe - R_FeS2_FeS_S0 - 4.0 * R_FeS2_SO4_H2S_FeS - R_FeS_ox
     rate_pFeS2 = R_FeS2_FeS_S0 + 4.0 * R_FeS2_SO4_H2S_FeS - 2.0 * R_FeS2_O2
 
@@ -437,7 +438,7 @@ function rates(
      Rfast_dtSO4, Rslow_dtSO4, Rfast_dCH4, Rslow_dCH4,
      Rfast_total, Rslow_total,
      R_dMnII, R_dFeII, R_dNH3, R_dH2S, R_dCH4_O2redox, R_dCH4_SO4redox, R_FEOH3_PO4_adsorp, R_Fe_MnO2_red, R_H2S_FeOOH_PO4_red, R_H2S_FeOOH_red, R_H2S_MnO2_red,
-     R_FeS_H2S_Fe, R_FeS2_FeS_S0, R_FeS2_SO4_H2S_FeS, R_FeS_ox, R_FeS2_O2, Rdiss_calcite, Rdiss_aragonite, Rprec_calcite, Rprec_aragonite) =
+     R_FeS_H2S_Fe, R_FeS2_FeS_S0, R_FeS2_SO4_H2S_FeS, R_FeS_ox, R_FeS2_O2, R_S0_H20, Rdiss_calcite, Rdiss_aragonite, Rprec_calcite, Rprec_aragonite) =
         getreactions(dO2, dtNO3, pMnO2, pFeOH3, dtSO4, dtNH4, dtH2S, dFeII, dMnII, dCH4, dtPO4, pFeOH3_PO4, pFeS, pS0, pFeS2,
                      pfoc_kfast, psoc_kslow, pcalcite, paragonite, dCa, dCO3, KCa, KAr, T, diss_scheme, Q10_secondary, Tref)
 
@@ -446,7 +447,7 @@ function rates(
                            Rfast_dtSO4, Rslow_dtSO4, Rfast_dCH4, Rslow_dCH4,
                            Rfast_total, Rslow_total,
                            R_dMnII, R_dFeII, R_dNH3, R_dH2S, R_dCH4_O2redox, R_dCH4_SO4redox, R_FEOH3_PO4_adsorp, 
-                           R_Fe_MnO2_red, R_H2S_FeOOH_PO4_red, R_H2S_FeOOH_red, R_H2S_MnO2_red, R_FeS_H2S_Fe, R_FeS2_FeS_S0, R_FeS2_SO4_H2S_FeS, R_FeS_ox, R_FeS2_O2,
+                           R_Fe_MnO2_red, R_H2S_FeOOH_PO4_red, R_H2S_FeOOH_red, R_H2S_MnO2_red, R_FeS_H2S_Fe, R_FeS2_FeS_S0, R_FeS2_SO4_H2S_FeS, R_FeS_ox, R_FeS2_O2, R_S0_H20,
                            Rdiss_calcite, Rdiss_aragonite, Rprec_calcite, Rprec_aragonite,
                            phiS_phi_z, RC, RN, RP)
 end
