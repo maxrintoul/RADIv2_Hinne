@@ -194,6 +194,7 @@ function redox(
     dtPO4::Float64,
     pFeOH3_PO4::Float64,
     pFeS::Float64,
+    pS0::Float64,
     Q10_secondary::Float64,
     T::Float64,
     Tref::Float64
@@ -214,9 +215,10 @@ function redox(
     R_H2S_FeOOH_red = VMAX_H2S_FeOOH_red * monod(dtH2S, CREF_H2S) * monod(pFeOH3, CREF_FeOH3) * Q10_secondary^((T - Tref)/10)
     R_H2S_MnO2_red = VMAX_H2S_MnO2_red * monod(dtH2S, CREF_H2S) * monod(pMnO2, CREF_MnO2) * Q10_secondary^((T - Tref)/10)
     R_FeS_H2S_Fe = VMAX_FeS_H2S_Fe * monod(dtH2S, CREF_H2S) * monod(pFeS, CREF_FeS) * Q10_secondary^((T - Tref)/10)
+    R_FeS2_FeS_S0 = VMAX_FeS2_FeS_S0 * monod(pFeS, CREF_FeS) * monod(pS0, CREF_S0) * Q10_secondary^((T - Tref)/10)
 
     return R_MnII_redox, R_FeII_redox, R_NH3_redox, R_H2S_redox, R_CH4_O2redox, R_CH4_SO4redox, R_FEOH3_PO4_adsorp, 
-        R_Fe_MnO2_red, R_H2S_FeOOH_PO4_red, R_H2S_FeOOH_red, R_H2S_MnO2_red, R_FeS_H2S_Fe
+        R_Fe_MnO2_red, R_H2S_FeOOH_PO4_red, R_H2S_FeOOH_red, R_H2S_MnO2_red, R_FeS_H2S_Fe, R_FeS2_FeS_S0
 end
 
 # =========================
@@ -314,7 +316,7 @@ end
 function getreactions(
     dO2::Float64, dtNO3::Float64, pMnO2::Float64, pFeOH3::Float64, dtSO4::Float64,
     dtNH4::Float64, dtH2S::Float64, dFeII::Float64, dMnII::Float64, dCH4::Float64, 
-    dtPO4::Float64, pFeOH3_PO4::Float64, pFeS::Float64,
+    dtPO4::Float64, pFeOH3_PO4::Float64, pFeS::Float64, pS0::Float64,
     pfoc_kfast::Float64, psoc_kslow::Float64,
     pcalcite::Float64, paragonite::Float64, dCa::Float64, dCO3::Float64, KCa::Float64, KAr::Float64, T::Float64, diss_scheme::Integer, Q10_secondary::Float64, Tref::Float64
 )
@@ -325,8 +327,8 @@ function getreactions(
 
     # Monod-limited redox
     R_dMnII, R_dFeII, R_dNH3, R_dH2S, R_CH4_O2redox, R_CH4_SO4redox, R_FEOH3_PO4_adsorp, R_Fe_MnO2_red, 
-    R_H2S_FeOOH_PO4_red, R_H2S_FeOOH_red, R_H2S_MnO2_red, R_FeS_H2S_Fe =
-        redox(dO2, dtNH4, dtH2S, dFeII, dMnII, dCH4, dtSO4, pFeOH3, pMnO2, dtPO4, pFeOH3_PO4, pFeS, Q10_secondary, T, Tref)
+    R_H2S_FeOOH_PO4_red, R_H2S_FeOOH_red, R_H2S_MnO2_red, R_FeS_H2S_Fe, R_FeS2_FeS_S0 =
+        redox(dO2, dtNH4, dtH2S, dFeII, dMnII, dCH4, dtSO4, pFeOH3, pMnO2, dtPO4, pFeOH3_PO4, pFeS, pS0, Q10_secondary, T, Tref)
 
     Rdiss_calcite, Rdiss_aragonite, Rprec_calcite, Rprec_aragonite =
         dissolve_precipitate_CaCO3(pcalcite, paragonite, dCa, dCO3, KCa, KAr, T, diss_scheme)
@@ -336,7 +338,7 @@ function getreactions(
             Rfast_dtSO4, Rslow_dtSO4, Rfast_dCH4, Rslow_dCH4,
             Rfast_total, Rslow_total,
             R_dMnII, R_dFeII, R_dNH3, R_dH2S, R_CH4_O2redox, R_CH4_SO4redox, R_FEOH3_PO4_adsorp, 
-            R_Fe_MnO2_red, R_H2S_FeOOH_PO4_red, R_H2S_FeOOH_red, R_H2S_MnO2_red, R_FeS_H2S_Fe,
+            R_Fe_MnO2_red, R_H2S_FeOOH_PO4_red, R_H2S_FeOOH_red, R_H2S_MnO2_red, R_FeS_H2S_Fe, R_FeS2_FeS_S0,
             Rdiss_calcite, Rdiss_aragonite, Rprec_calcite, Rprec_aragonite)
 end
 
@@ -352,7 +354,7 @@ function reactions2rates(
     R_dMnII::Float64, R_dFeII::Float64, R_dNH3::Float64, R_dH2S::Float64,
     R_CH4_O2redox::Float64, R_CH4_SO4redox::Float64,
     R_FEOH3_PO4_adsorp::Float64, R_Fe_MnO2_red::Float64, R_H2S_FeOOH_PO4_red::Float64,
-    R_H2S_FeOOH_red::Float64, R_H2S_MnO2_red::Float64, R_FeS_H2S_Fe::Float64,
+    R_H2S_FeOOH_red::Float64, R_H2S_MnO2_red::Float64, R_FeS_H2S_Fe::Float64, R_FeS2_FeS_S0::Float64,
     Rdiss_calcite::Float64, Rdiss_aragonite::Float64,
     Rprec_calcite::Float64, Rprec_aragonite::Float64,
     phiS_phi_z::Float64, RC::Float64, RN::Float64, RP::Float64,
@@ -392,8 +394,9 @@ function reactions2rates(
     rate_pFeOH3= RC * (-4.0*Rdeg_pFeOH3) + d2p * R_dFeII - R_FEOH3_PO4_adsorp - 2.0 * R_H2S_FeOOH_red
     rate_pMnO2 = RC * (-2.0*Rdeg_pMnO2) + d2p * R_dMnII - R_Fe_MnO2_red - R_H2S_MnO2_red
     rate_pFeOH3_PO4 = R_FEOH3_PO4_adsorp - 2 * R_H2S_FeOOH_PO4_red
-    rate_S0 = R_H2S_FeOOH_PO4_red + R_H2S_FeOOH_red + R_H2S_MnO2_red
-    rate_pFeS = d2p * R_FeS_H2S_Fe
+    rate_S0 = R_H2S_FeOOH_PO4_red + R_H2S_FeOOH_red + R_H2S_MnO2_red - R_FeS2_FeS_S0
+    rate_pFeS = d2p * R_FeS_H2S_Fe - R_FeS2_FeS_S0
+    rate_pFeS2 = R_FeS2_FeS_S0
 
     # TA and Ca
     rate_dCa  = p2d * Rdiss_CaCO3
@@ -412,13 +415,13 @@ function reactions2rates(
 
     return (rate_dO2, rate_dtCO2, rate_dtNO3, rate_dtSO4, rate_dtPO4, rate_dtNH4,
             rate_dtH2S, rate_dFeII, rate_dMnII, rate_dCH4, rate_dalk, rate_dCa,
-            rate_pfoc, rate_psoc, rate_pFeOH3, rate_pMnO2, rate_pFeS, rate_pFeOH3_PO4, rate_S0, rate_pcalcite, rate_paragonite,
+            rate_pfoc, rate_psoc, rate_pFeOH3, rate_pMnO2, rate_pFeS, rate_pFeS2, rate_pFeOH3_PO4, rate_S0, rate_pcalcite, rate_paragonite,
             Rdeg_dO2, Rdeg_dtNO3, Rdeg_dtSO4, Rdeg_pFeOH3, Rdeg_pMnO2, Rdeg_dCH4, Rdeg_total)
 end
 
 "Rates of change of each component."
 function rates(
-    dO2, dtNO3, pMnO2, pFeOH3, dtSO4, dtNH4, dtH2S, dFeII, dMnII, dCH4, dtPO4, pFeOH3_PO4, pFeS,
+    dO2, dtNO3, pMnO2, pFeOH3, dtSO4, dtNH4, dtH2S, dFeII, dMnII, dCH4, dtPO4, pFeOH3_PO4, pFeS, pS0,
     pfoc_kfast, psoc_kslow, pcalcite, paragonite, dCa, dCO3, KCa, KAr,
     phiS_phi_z, RC, RN, RP, T, diss_scheme, Q10_secondary, Tref
 )
@@ -427,8 +430,8 @@ function rates(
      Rfast_dtSO4, Rslow_dtSO4, Rfast_dCH4, Rslow_dCH4,
      Rfast_total, Rslow_total,
      R_dMnII, R_dFeII, R_dNH3, R_dH2S, R_dCH4_O2redox, R_dCH4_SO4redox, R_FEOH3_PO4_adsorp, R_Fe_MnO2_red, R_H2S_FeOOH_PO4_red, R_H2S_FeOOH_red, R_H2S_MnO2_red,
-     R_FeS_H2S_Fe, Rdiss_calcite, Rdiss_aragonite, Rprec_calcite, Rprec_aragonite) =
-        getreactions(dO2, dtNO3, pMnO2, pFeOH3, dtSO4, dtNH4, dtH2S, dFeII, dMnII, dCH4, dtPO4, pFeOH3_PO4, pFeS,
+     R_FeS_H2S_Fe, R_FeS2_FeS_S0, Rdiss_calcite, Rdiss_aragonite, Rprec_calcite, Rprec_aragonite) =
+        getreactions(dO2, dtNO3, pMnO2, pFeOH3, dtSO4, dtNH4, dtH2S, dFeII, dMnII, dCH4, dtPO4, pFeOH3_PO4, pFeS, pS0,
                      pfoc_kfast, psoc_kslow, pcalcite, paragonite, dCa, dCO3, KCa, KAr, T, diss_scheme, Q10_secondary, Tref)
 
     return reactions2rates(Rfast_dO2, Rslow_dO2, Rfast_dtNO3, Rslow_dtNO3,
@@ -436,7 +439,7 @@ function rates(
                            Rfast_dtSO4, Rslow_dtSO4, Rfast_dCH4, Rslow_dCH4,
                            Rfast_total, Rslow_total,
                            R_dMnII, R_dFeII, R_dNH3, R_dH2S, R_dCH4_O2redox, R_dCH4_SO4redox, R_FEOH3_PO4_adsorp, 
-                           R_Fe_MnO2_red, R_H2S_FeOOH_PO4_red, R_H2S_FeOOH_red, R_H2S_MnO2_red, R_FeS_H2S_Fe,
+                           R_Fe_MnO2_red, R_H2S_FeOOH_PO4_red, R_H2S_FeOOH_red, R_H2S_MnO2_red, R_FeS_H2S_Fe, R_FeS2_FeS_S0,
                            Rdiss_calcite, Rdiss_aragonite, Rprec_calcite, Rprec_aragonite,
                            phiS_phi_z, RC, RN, RP)
 end
