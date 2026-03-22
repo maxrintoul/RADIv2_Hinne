@@ -67,6 +67,15 @@ function degradationfactors(
     fdCH4N   = fdCH4  /= fox
     foxN     = fdO2N + fdtNO3N + fpMnO2N + fpFeOH3N + fdtSO4N + fdCH4N
 
+    # Test each reaction indiviually 
+    fdO2N    = fdO2   /= fox
+    fdtNO3N  = fdtNO3 /= fox
+    fpMnO2N  = fpMnO2 /= fox
+    fpFeOH3N = fpFeOH3/= fox
+    fdtSO4N  = fdtSO4 /= fox
+    fdCH4N   = fdCH4  /= fox
+    foxN     = fdO2N + fdtNO3N + fpMnO2N + fpFeOH3N + fdtSO4N + fdCH4N
+
     return fdO2N, fdtNO3N, fpMnO2N, fpFeOH3N, fdtSO4N, fdCH4N, foxN
 end
 
@@ -200,29 +209,72 @@ function redox(
     T::Float64,
     Tref::Float64
 )
-    rO2 = monod(dO2, K_O2)
+    # # Monod formulation for redox rates with temperature dependence (Q10)
+    # rO2 = monod(dO2, K_O2)
 
-    R_NH3_redox   = VMAX_NH3     * monod(dtNH4, K_NH4) * rO2  * Q10_secondary^((T - Tref)/10)
-    R_H2S_redox   = VMAX_H2S     * monod(dtH2S, K_H2S) * rO2  * Q10_secondary^((T - Tref)/10)
-    R_FeII_redox  = VMAX_Fe      * monod(dFeII, K_Fe ) * rO2  * Q10_secondary^((T - Tref)/10)
-    R_MnII_redox  = VMAX_Mn      * monod(dMnII, K_Mn ) * rO2  * Q10_secondary^((T - Tref)/10)
+    # R_NH3_redox   = VMAX_NH3     * monod(dtNH4, K_NH4) * rO2  * Q10_secondary^((T - Tref)/10)
+    # R_H2S_redox   = VMAX_H2S     * monod(dtH2S, K_H2S) * rO2  * Q10_secondary^((T - Tref)/10)
+    # R_FeII_redox  = VMAX_Fe      * monod(dFeII, K_Fe ) * rO2  * Q10_secondary^((T - Tref)/10)
+    # R_MnII_redox  = VMAX_Mn      * monod(dMnII, K_Mn ) * rO2  * Q10_secondary^((T - Tref)/10)
 
-    R_CH4_O2redox  = VMAX_CH4_O2  * monod(dCH4, K_CH4) * rO2  * Q10_secondary^((T - Tref)/10)
-    R_CH4_SO4redox = VMAX_CH4_SO4 * monod(dCH4, K_CH4) * monod(dtSO4, K_SO4) * Q10_secondary^((T - Tref)/10)
+    # R_CH4_O2redox  = VMAX_CH4_O2  * monod(dCH4, K_CH4) * rO2  * Q10_secondary^((T - Tref)/10)
+    # R_CH4_SO4redox = VMAX_CH4_SO4 * monod(dCH4, K_CH4) * monod(dtSO4, K_SO4) * Q10_secondary^((T - Tref)/10)
 
-    R_FEOH3_PO4_adsorp = VMAX_FeOH3_PO4_adsorp * monod(pFeOH3, CREF_FeOH3) * monod(dtPO4, CREF_PO4) * Q10_secondary^((T - Tref)/10)
-    R_Fe_MnO2_red = VMAX_Fe_MnO2_red * monod(pFeOH3, CREF_FeOH3) * monod(pMnO2, CREF_MnO2) * Q10_secondary^((T - Tref)/10)
-    R_H2S_FeOOH_PO4_red = VMAX_H2S_FeOOH_PO4_red * monod(dtH2S, CREF_H2S) * monod(pFeOH3_PO4, CREF_FeOH3_PO4) * Q10_secondary^((T - Tref)/10)
-    R_H2S_FeOOH_red = VMAX_H2S_FeOOH_red * monod(dtH2S, CREF_H2S) * monod(pFeOH3, CREF_FeOH3) * Q10_secondary^((T - Tref)/10)
-    R_H2S_MnO2_red = VMAX_H2S_MnO2_red * monod(dtH2S, CREF_H2S) * monod(pMnO2, CREF_MnO2) * Q10_secondary^((T - Tref)/10)
-    R_FeS_H2S_Fe = VMAX_FeS_H2S_Fe * monod(dtH2S, CREF_H2S) * monod(pFeS, CREF_FeS) * Q10_secondary^((T - Tref)/10)
-    R_FeS2_FeS_S0 = VMAX_FeS2_FeS_S0 * monod(pFeS, CREF_FeS) * monod(pS0, CREF_S0) * Q10_secondary^((T - Tref)/10)
-    R_FeS2_SO4_H2S_FeS = VMAX_FeS2_SO4_H2S_FeS * monod(pFeS, CREF_FeS) * Q10_secondary^((T - Tref)/10)
-    R_FeS_ox = VMAX_FeS_ox * monod(pFeS, CREF_FeS) * monod(dO2, K_O2) * Q10_secondary^((T - Tref)/10)
-    R_FeS2_O2 = VMAX_FeS2_O2 * monod(pFeS2, CREF_FeS2) * monod(dO2, K_O2) * Q10_secondary^((T - Tref)/10)
-    R_S0_H20 = VMAX_S0_H20 * monod(pS0, CREF_S0) * Q10_secondary^((T - Tref)/10)
-    R_MnO2a_MnO2b = VMAX_MnO2a_MnO2b * monod(pMnO2, CREF_MnO2) * Q10_secondary^((T - Tref)/10)
-    R_FeOOHa_FeOOHb = VMAX_FeOOHa_FeOOHb * monod(pFeOH3, CREF_FeOH3) * Q10_secondary^((T - Tref)/10)
+    # R_FEOH3_PO4_adsorp = VMAX_FeOH3_PO4_adsorp * monod(pFeOH3, CREF_FeOH3) * monod(dtPO4, CREF_PO4) * Q10_secondary^((T - Tref)/10)
+    # R_Fe_MnO2_red = VMAX_Fe_MnO2_red * monod(pFeOH3, CREF_FeOH3) * monod(pMnO2, CREF_MnO2) * Q10_secondary^((T - Tref)/10)
+    # R_H2S_FeOOH_PO4_red = VMAX_H2S_FeOOH_PO4_red * monod(dtH2S, CREF_H2S) * monod(pFeOH3_PO4, CREF_FeOH3_PO4) * Q10_secondary^((T - Tref)/10)
+    # R_H2S_FeOOH_red = VMAX_H2S_FeOOH_red * monod(dtH2S, CREF_H2S) * monod(pFeOH3, CREF_FeOH3) * Q10_secondary^((T - Tref)/10)
+    # R_H2S_MnO2_red = VMAX_H2S_MnO2_red * monod(dtH2S, CREF_H2S) * monod(pMnO2, CREF_MnO2) * Q10_secondary^((T - Tref)/10)
+    # R_FeS_H2S_Fe = VMAX_FeS_H2S_Fe * monod(dtH2S, CREF_H2S) * monod(pFeS, CREF_FeS) * Q10_secondary^((T - Tref)/10)
+    # R_FeS2_FeS_S0 = VMAX_FeS2_FeS_S0 * monod(pFeS, CREF_FeS) * monod(pS0, CREF_S0) * Q10_secondary^((T - Tref)/10)
+    # R_FeS2_SO4_H2S_FeS = VMAX_FeS2_SO4_H2S_FeS * monod(pFeS, CREF_FeS) * Q10_secondary^((T - Tref)/10)
+    # R_FeS_ox = VMAX_FeS_ox * monod(pFeS, CREF_FeS) * monod(dO2, K_O2) * Q10_secondary^((T - Tref)/10)
+    # R_FeS2_O2 = VMAX_FeS2_O2 * monod(pFeS2, CREF_FeS2) * monod(dO2, K_O2) * Q10_secondary^((T - Tref)/10)
+    # R_S0_H20 = VMAX_S0_H20 * monod(pS0, CREF_S0) * Q10_secondary^((T - Tref)/10)
+    # R_MnO2a_MnO2b = VMAX_MnO2a_MnO2b * monod(pMnO2, CREF_MnO2) * Q10_secondary^((T - Tref)/10)
+    # R_FeOOHa_FeOOHb = VMAX_FeOOHa_FeOOHb * monod(pFeOH3, CREF_FeOH3) * Q10_secondary^((T - Tref)/10)
+
+    # # Mass-action formulation for redox rates with temperature dependence (Q10)
+    R_NH3_redox   = kNH3_redox   * max(dO2, 0.0) * max(dtNH4, 0.0) * Q10_secondary^((T - Tref)/10)
+    R_H2S_redox   = kH2S_redox   * max(dO2, 0.0) * max(dtH2S, 0.0) * Q10_secondary^((T - Tref)/10)
+    R_FeII_redox  = kFeII_redox  * max(dO2, 0.0) * max(dFeII, 0.0) * Q10_secondary^((T - Tref)/10)
+    R_MnII_redox  = kMnII_redox  * max(dO2, 0.0) * max(dMnII, 0.0) * Q10_secondary^((T - Tref)/10)
+    R_CH4_O2redox  = kCH4_O2redox * max(dO2, 0.0) * max(dCH4, 0.0) * Q10_secondary^((T - Tref)/10)
+    R_CH4_SO4redox = kCH4_SO4redox* max(dtSO4, 0.0)* max(dCH4, 0.0)   * Q10_secondary^((T - Tref)/10)
+    R_FEOH3_PO4_adsorp = kFeOH3_PO4_adsorp * max(pFeOH3, 0.0) * max(dtPO4, 0.0) * Q10_secondary^((T - Tref)/10)
+    R_Fe_MnO2_red = kFe_MnO2_red * max(pFeOH3, 0.0) * max(pMnO2, 0.0) * Q10_secondary^((T - Tref)/10)
+    R_H2S_FeOOH_PO4_red = kH2S_FeOOH_PO4_red * max(dtH2S, 0.0) * max(pFeOH3_PO4, 0.0) * Q10_secondary^((T - Tref)/10)
+    R_H2S_FeOOH_red = kH2S_FeOOH_red * max(dtH2S, 0.0) * max(pFeOH3, 0.0) * Q10_secondary^((T - Tref)/10)
+    R_H2S_MnO2_red = kH2S_MnO2_red * max(dtH2S, 0.0) * max(pMnO2, 0.0) * Q10_secondary^((T - Tref)/10)
+    R_FeS_H2S_Fe = kpFeS_H2S_Fe * max(dtH2S, 0.0) * max(pFeS, 0.0) * Q10_secondary^((T - Tref)/10)
+    R_FeS2_FeS_S0 = kpFeS2_FeS_S0 * max(pFeS, 0.0) * max(pS0, 0.0) * Q10_secondary^((T - Tref)/10)
+    R_FeS2_SO4_H2S_FeS = kpFeS2_SO4_H2S_FeS * max(pFeS, 0.0) * Q10_secondary^((T - Tref)/10)
+    R_FeS_ox = kFeS_ox * max(pFeS, 0.0) * max(dO2, 0.0) * Q10_secondary^((T - Tref)/10)
+    R_FeS2_O2 = kFeS2_O2 * max(pFeS2, 0.0) * max(dO2, 0.0) * Q10_secondary^((T - Tref)/10)
+    R_S0_H20 = kS0_H2O_ox * max(pS0, 0.0) * Q10_secondary^((T - Tref)/10)
+    R_MnO2a_MnO2b = kMnO2a_MnO2b * max(pMnO2, 0.0) * Q10_secondary^((T - Tref)/10)
+    R_FeOOHa_FeOOHb = kFeOOHa_FeOOHb * max(pFeOH3, 0.0) * Q10_secondary^((T - Tref)/10)
+
+    #  # # Mass-action formulation for redox rates with temperature dependence (Q10) - set to 0 to test other reactions individually
+    # R_NH3_redox   = 0.0 #kNH3_redox   * dO2 * dtNH4  * Q10_secondary^((T - Tref)/10)
+    # R_H2S_redox   = 0.0 #kH2S_redox   * dO2 * dtH2S  * Q10_secondary^((T - Tref)/10)
+    # R_FeII_redox  = 0.0 #kFeII_redox  * dO2 * dFeII   * Q10_secondary^((T - Tref)/10)
+    # R_MnII_redox  = 0.0 #kMnII_redox  * dO2 * dMnII   * Q10_secondary^((T - Tref)/10)
+    # R_CH4_O2redox  = 0.0 #kCH4_O2redox * dO2 * dCH4   * Q10_secondary^((T - Tref)/10)
+    # R_CH4_SO4redox = 0.0 #kCH4_SO4redox* dtSO4* dCH4   * Q10_secondary^((T - Tref)/10)
+    # R_FEOH3_PO4_adsorp = 0.0 # kFeOH3_PO4_adsorp * pFeOH3 * dtPO4 * Q10_secondary^((T - Tref)/10)
+    # R_Fe_MnO2_red = 0.0 # kFe_MnO2_red * pFeOH3 * pMnO2 * Q10_secondary^((T - Tref)/10)
+    # R_H2S_FeOOH_PO4_red = 0.0 # kH2S_FeOOH_PO4_red * dtH2S * pFeOH3_PO4 * Q10_secondary^((T - Tref)/10)
+    # R_H2S_FeOOH_red = 0.0 # kH2S_FeOOH_red * dtH2S * pFeOH3 * Q10_secondary^((T - Tref)/10)
+    # R_H2S_MnO2_red = 0.0 # kH2S_MnO2_red * dtH2S * pMnO2 * Q10_secondary^((T - Tref)/10)
+    # R_FeS_H2S_Fe = 0.0 # kpFeS_H2S_Fe * dtH2S * pFeS * Q10_secondary^((T - Tref)/10)
+    # R_FeS2_FeS_S0 = 0.0 # kpFeS2_FeS_S0 * pFeS * pS0 * Q10_secondary^((T - Tref)/10)
+    # R_FeS2_SO4_H2S_FeS = 0.0 # kpFeS2_SO4_H2S_FeS * pFeS * Q10_secondary^((T - Tref)/10)
+    # R_FeS_ox = 0.0 # kFeS_ox * pFeS * dO2 * Q10_secondary^((T - Tref)/10)
+    # R_FeS2_O2 = 0.0 # kFeS2_O2 * pFeS2 * dO2 * Q10_secondary^((T - Tref)/10)
+    # R_S0_H20 = 0.0 # kS0_H2O_ox * pS0 * Q10_secondary^((T - Tref)/10)
+    # R_MnO2a_MnO2b = 0.0 # kMnO2a_MnO2b * pMnO2 * Q10_secondary^((T - Tref)/10)
+    # R_FeOOHa_FeOOHb = 0.0 # kFeOOHa_FeOOHb * pFeOH3 * Q10_secondary^((T - Tref)/10)
 
     return R_MnII_redox, R_FeII_redox, R_NH3_redox, R_H2S_redox, R_CH4_O2redox, R_CH4_SO4redox, R_FEOH3_PO4_adsorp, 
         R_Fe_MnO2_red, R_H2S_FeOOH_PO4_red, R_H2S_FeOOH_red, R_H2S_MnO2_red, R_FeS_H2S_Fe, R_FeS2_FeS_S0, 
@@ -419,11 +471,18 @@ function reactions2rates(
                         (RN - RP + 1.0RC)    *  Rdeg_dtSO4 +
                         2.0                  *  Rdiss_CaCO3 ) +
                2.0 * R_CH4_SO4redox -
-               2.0 * (R_dMnII + R_dFeII + R_dNH3 + R_dH2S)
+               2.0 * (R_dMnII + R_dFeII + R_dNH3 + R_dH2S) - 
+               2.0 * p2d * R_Fe_MnO2_red + 
+               4.0 * p2d * R_H2S_FeOOH_PO4_red +
+               4.0 * p2d * R_H2S_FeOOH_red -
+               2.0 * p2d * R_H2S_MnO2_red -
+               2.0 * d2p * R_FeS_H2S_Fe +
+               2.0 * d2p * R_FeS2_SO4_H2S_FeS - 
+               4.0 * p2d * R_FeS2_O2
 
     # CaCO3 minerals
     rate_pcalcite   = -Rdiss_calcite + Rprec_calcite
-    rate_paragonite = -Rdiss_aragonite
+    rate_paragonite = -Rdiss_aragonite + Rprec_aragonite
 
     return (rate_dO2, rate_dtCO2, rate_dtNO3, rate_dtSO4, rate_dtPO4, rate_dtNH4,
             rate_dtH2S, rate_dFeII, rate_dMnII, rate_dCH4, rate_dalk, rate_dCa,
