@@ -15,4 +15,6 @@ module load julia/1.11.0
 cd $PBS_O_WORKDIR
 
 export JULIA_NUM_THREADS=4
-julia -e 'include("runfile_ensemble.jl")'
+export OPENBLAS_NUM_THREADS=1
+
+julia --project=. runfile_ensemble.jl
