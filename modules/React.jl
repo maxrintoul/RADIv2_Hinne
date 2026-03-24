@@ -27,6 +27,13 @@ const TRANSITION_OMEGA = 0.9
 const LOW_TEMP_THRESHOLD = 5.0
 const TIME_SA_CONVERSION = 4e6 *60^2 *24 *365 /4.709197671429600e+02 # Is this necessary when using the solver?
 
+# Aragonite dissolution constants
+const k2_a = 1.583712083676010
+const k2_b = 0.704346007660963
+const n2_a = 1.249968365698364
+const n2_b = 0.016295603867813
+const n1_arag = 0.13
+
 # Monod scheme inhibition factors
 inhibition_dO2(dO2::Float64)      = KMi_dO2   / (KMi_dO2   + dO2)
 inhibition_dtNO3(dtNO3::Float64)  = KMi_dtNO3 / (KMi_dtNO3 + dtNO3)
@@ -242,11 +249,11 @@ function redox(
     R_CH4_O2redox  = kCH4_O2redox * max(dO2, 0.0) * max(dCH4, 0.0) * Q10_secondary^((T - Tref)/10)
     R_CH4_SO4redox = kCH4_SO4redox* max(dtSO4, 0.0)* max(dCH4, 0.0)   * Q10_secondary^((T - Tref)/10)
     R_FEOH3_PO4_adsorp = kFeOH3_PO4_adsorp * max(pFeOH3, 0.0) * max(dtPO4, 0.0) * Q10_secondary^((T - Tref)/10)
-    R_Fe_MnO2_red = kFe_MnO2_red * max(pFeOH3, 0.0) * max(pMnO2, 0.0) * Q10_secondary^((T - Tref)/10)
+    R_Fe_MnO2_red = kFe_MnO2_red * max(dFeII, 0.0) * max(pMnO2, 0.0) * Q10_secondary^((T - Tref)/10)
     R_H2S_FeOOH_PO4_red = kH2S_FeOOH_PO4_red * max(dtH2S, 0.0) * max(pFeOH3_PO4, 0.0) * Q10_secondary^((T - Tref)/10)
     R_H2S_FeOOH_red = kH2S_FeOOH_red * max(dtH2S, 0.0) * max(pFeOH3, 0.0) * Q10_secondary^((T - Tref)/10)
     R_H2S_MnO2_red = kH2S_MnO2_red * max(dtH2S, 0.0) * max(pMnO2, 0.0) * Q10_secondary^((T - Tref)/10)
-    R_FeS_H2S_Fe = kpFeS_H2S_Fe * max(dtH2S, 0.0) * max(pFeS, 0.0) * Q10_secondary^((T - Tref)/10)
+    R_FeS_H2S_Fe = kpFeS_H2S_Fe * max(dtH2S, 0.0) * max(dFeII, 0.0) * Q10_secondary^((T - Tref)/10)
     R_FeS2_FeS_S0 = kpFeS2_FeS_S0 * max(pFeS, 0.0) * max(pS0, 0.0) * Q10_secondary^((T - Tref)/10)
     R_FeS2_SO4_H2S_FeS = kpFeS2_SO4_H2S_FeS * max(pFeS, 0.0) * Q10_secondary^((T - Tref)/10)
     R_FeS_ox = kFeS_ox * max(pFeS, 0.0) * max(dO2, 0.0) * Q10_secondary^((T - Tref)/10)
@@ -298,13 +305,14 @@ function dissolve_precipitate_CaCO3(
     KCa::Float64,
     KAr::Float64,
     T,
-    diss_scheme::Integer = 1
+    calcite_diss_scheme::Integer = 2,
+    aragonite_diss_scheme::Integer = 2
 )
     # Saturation states
     OmegaCa = dCa * dCO3 / KCa
     OmegaAr = dCa * dCO3 / KAr
 
-    if diss_scheme == 1
+    if calcite_diss_scheme == 1
         # Base RADI kinetics (Naviaux et al. 2019 for calcite, Dong et al. 2019 for aragonite)
 
         # Calcite dissolution (Naviaux et al. 2019)
@@ -319,7 +327,7 @@ function dissolve_precipitate_CaCO3(
             (OmegaAr <= 0.835)       ? (paragonite * 0.042  * (1.0 - OmegaAr)^1.46) :
                                     0.0
 
-    elseif diss_scheme == 2
+    elseif calcite_diss_scheme == 2
         # Temperature dependent calcite dissolution from fitting the data within Naviaux et al. (2019) Marine Chemistry
         if 1.0 <= OmegaCa
             Rdiss_calcite = 0.0 # Supersaturation - no dissolution
@@ -347,13 +355,33 @@ function dissolve_precipitate_CaCO3(
                 Rdiss_calcite = max(etch_pit_rate, defect_assisted_rate)
             end
         end
+    end
 
-        # Aragonite dissolution (Dong et al. 2019)
+    # Aragonite dissolution (Dong et al. 2019)
+    if aragonite_diss_scheme == 1
         Rdiss_aragonite =
             (0.835 < OmegaAr <= 1.0) ? (paragonite * 0.0038 * (1.0 - OmegaAr)^0.13) :
             (OmegaAr <= 0.835)       ? (paragonite * 0.042  * (1.0 - OmegaAr)^1.46) :
                                     0.0
+    elseif aragonite_diss_scheme == 2
+
+        k2_a = 0.0038*(1-0.9)^(0.13 - n2_a-n2_b*5)-k2_b*5;
+        k2_arag = k2_a+k2_b*T;
+        n2_arag = n2_a+n2_b*T;
+
+        if OmegaAr <= 1 && OmegaAr > 0.9
+            k1_arag = k2_arag.*(1-OmegaAr).^(n2_arag-n1_arag);
+            Rdiss_aragonite = paragonite.*k1_arag.*(1-OmegaAr).^n1_arag;
+        elseif OmegaAr <= 0.9
+            Rdiss_aragonite = paragonite.*k2_arag.*(1-OmegaAr).^n2_arag;
+        else
+            Rdiss_aragonite = 0.0
+        end
     end
+
+
+
+
 
             
 
@@ -378,7 +406,7 @@ function getreactions(
     dtNH4::Float64, dtH2S::Float64, dFeII::Float64, dMnII::Float64, dCH4::Float64, 
     dtPO4::Float64, pFeOH3_PO4::Float64, pFeS::Float64, pS0::Float64, pFeS2::Float64,
     pfoc_kfast::Float64, psoc_kslow::Float64,
-    pcalcite::Float64, paragonite::Float64, dCa::Float64, dCO3::Float64, KCa::Float64, KAr::Float64, T::Float64, diss_scheme::Integer, Q10_secondary::Float64, Tref::Float64
+    pcalcite::Float64, paragonite::Float64, dCa::Float64, dCO3::Float64, KCa::Float64, KAr::Float64, T::Float64, calcite_diss_scheme::Integer, aragonite_diss_scheme::Integer, Q10_secondary::Float64, Tref::Float64
 )
     Rfast_dO2, Rslow_dO2, Rfast_dtNO3, Rslow_dtNO3, Rfast_pMnO2, Rslow_pMnO2,
     Rfast_pFeOH3, Rslow_pFeOH3, Rfast_dtSO4, Rslow_dtSO4, Rfast_dCH4, Rslow_dCH4,
@@ -392,7 +420,7 @@ function getreactions(
         redox(dO2, dtNH4, dtH2S, dFeII, dMnII, dCH4, dtSO4, pFeOH3, pMnO2, dtPO4, pFeOH3_PO4, pFeS, pS0, pFeS2, Q10_secondary, T, Tref)
 
     Rdiss_calcite, Rdiss_aragonite, Rprec_calcite, Rprec_aragonite =
-        dissolve_precipitate_CaCO3(pcalcite, paragonite, dCa, dCO3, KCa, KAr, T, diss_scheme)
+        dissolve_precipitate_CaCO3(pcalcite, paragonite, dCa, dCO3, KCa, KAr, T, calcite_diss_scheme, aragonite_diss_scheme)
 
     return (Rfast_dO2, Rslow_dO2, Rfast_dtNO3, Rslow_dtNO3,
             Rfast_pMnO2, Rslow_pMnO2, Rfast_pFeOH3, Rslow_pFeOH3,
@@ -494,7 +522,7 @@ end
 function rates(
     dO2, dtNO3, pMnO2, pFeOH3, dtSO4, dtNH4, dtH2S, dFeII, dMnII, dCH4, dtPO4, pFeOH3_PO4, pFeS, pS0, pFeS2,
     pfoc_kfast, psoc_kslow, pcalcite, paragonite, dCa, dCO3, KCa, KAr,
-    phiS_phi_z, RC, RN, RP, T, diss_scheme, Q10_secondary, Tref
+    phiS_phi_z, RC, RN, RP, T, calcite_diss_scheme, aragonite_diss_scheme, Q10_secondary, Tref
 )
     (Rfast_dO2, Rslow_dO2, Rfast_dtNO3, Rslow_dtNO3,
      Rfast_pMnO2, Rslow_pMnO2, Rfast_pFeOH3, Rslow_pFeOH3,
@@ -503,7 +531,7 @@ function rates(
      R_dMnII, R_dFeII, R_dNH3, R_dH2S, R_dCH4_O2redox, R_dCH4_SO4redox, R_FEOH3_PO4_adsorp, R_Fe_MnO2_red, R_H2S_FeOOH_PO4_red, R_H2S_FeOOH_red, R_H2S_MnO2_red,
      R_FeS_H2S_Fe, R_FeS2_FeS_S0, R_FeS2_SO4_H2S_FeS, R_FeS_ox, R_FeS2_O2, R_S0_H20, R_MnO2a_MnO2b, R_FeOOHa_FeOOHb, Rdiss_calcite, Rdiss_aragonite, Rprec_calcite, Rprec_aragonite) =
         getreactions(dO2, dtNO3, pMnO2, pFeOH3, dtSO4, dtNH4, dtH2S, dFeII, dMnII, dCH4, dtPO4, pFeOH3_PO4, pFeS, pS0, pFeS2,
-                     pfoc_kfast, psoc_kslow, pcalcite, paragonite, dCa, dCO3, KCa, KAr, T, diss_scheme, Q10_secondary, Tref)
+                     pfoc_kfast, psoc_kslow, pcalcite, paragonite, dCa, dCO3, KCa, KAr, T, calcite_diss_scheme, aragonite_diss_scheme, Q10_secondary, Tref)
 
     return reactions2rates(Rfast_dO2, Rslow_dO2, Rfast_dtNO3, Rslow_dtNO3,
                            Rfast_pMnO2, Rslow_pMnO2, Rfast_pFeOH3, Rslow_pFeOH3,
