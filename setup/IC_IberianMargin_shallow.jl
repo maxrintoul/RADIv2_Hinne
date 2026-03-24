@@ -6,7 +6,7 @@ dz_top=0.2e-3 # depth resolution at top of sediment
 dz_bot=5e-2 # depth resolution at bottom of sediment
 Nz=51  # number of depth layers
 
-tspan = (0.0, 1.0) # in years
+tspan = (0.0, 10.0) # in years
 
 # +
 # wave
@@ -54,6 +54,7 @@ dSi_w = 9.66e-6  # total silicate from GLODAP nearest station, bottom waters
 
 # Define organic matter flux to the surface sediment
 Fpom = 44.215395617325186  # flux of POM to seafloor / g/m^2/a (Epping et al., 2002)
+# Mpom = 33.52618867924528  # g/mol, computed from the C:N:P ratios of POM in Epping et al., 2002
 Fpom_r = 0.0  # refractory fraction of POM
 Fpom_s = 0.27348635644808994# slow-degrading fraction of POM
 Fpom_f = 0.7265136435519101# fast-degrading fraction of POM
@@ -104,8 +105,8 @@ Q10_secondary = 3.8 # typical value for biological reactions - Fossing et al. (2
 Tref = 9.0 # reference temperature for Q10 / °C - Fossing et al. (2004)
 
 # Optional factorial controls
-factorial_T_levels        = [10.0, 20.0]#, 30.0]
-factorial_Fpom_levels     = [0.01, 0.1]#, 1.0]
+factorial_T_levels        = [10.0]#, 30.0]
+factorial_Fpom_levels     = [33.52618867924528*0.1, 33.52618867924528, 33.52618867924528*10.0]
 factorial_U_levels        = [U]
 factorial_P_levels        = [P]
-factorial_Fcalcite_levels = [Fcalcite]
+factorial_Fcalcite_levels = [0.01, 0.1, 1.0]
