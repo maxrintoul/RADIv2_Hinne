@@ -6,7 +6,7 @@ dz_top=0.2e-3 # depth resolution at top of sediment
 dz_bot=5e-2 # depth resolution at bottom of sediment
 Nz=51  # number of depth layers
 
-tspan = (0.0, 10.0) # in years
+tspan = (0.0, 1.0) # in years
 
 # +
 # wave
@@ -102,3 +102,10 @@ aragonite_diss_scheme = 2
 Q10_primary = 2.0 # typical value for biological processes - Fossing et al. (2004)
 Q10_secondary = 3.8 # typical value for biological reactions - Fossing et al. (2004)
 Tref = 9.0 # reference temperature for Q10 / °C - Fossing et al. (2004)
+
+# Optional factorial controls
+factorial_T_levels        = [10.0, 20.0]#, 30.0]
+factorial_Fpom_levels     = [0.01, 0.1]#, 1.0]
+factorial_U_levels        = [U]
+factorial_P_levels        = [P]
+factorial_Fcalcite_levels = [Fcalcite]
