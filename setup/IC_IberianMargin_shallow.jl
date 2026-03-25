@@ -110,3 +110,4 @@ factorial_Fpom_levels     = [33.52618867924528*0.1, 33.52618867924528, 33.526188
 factorial_U_levels        = [U]
 factorial_P_levels        = [P]
 factorial_Fcalcite_levels = [0.01, 0.1, 1.0]
+factorial_O_levels        = [0.3, 50, 100, 400]
