@@ -18,6 +18,9 @@
 #shows the number of threads available for JULIA. 
 Threads.nthreads()
 
+# %% [markdown]
+# ### Load packages for for plotting and the Differential Equation solver
+
 # %%
 using Distributed
 @everywhere using MAT
@@ -26,6 +29,9 @@ using Distributed
 @everywhere using JLD2
 using StaticArrays
 
+# %% [markdown]
+# ### RADI modules
+
 # %%
 include("modules/gsw_rho.jl")
 include("modules/CO2System.jl")
@@ -33,15 +39,18 @@ include("modules/React.jl")
 include("modules/Equilibrate.jl")
 include("modules/Params.jl");
 
+# %% [markdown]
+# ### Initial conditions
+
 # %%
-# Load initial conditions
 @everywhere include("setup/IC_IberianMargin_shallow.jl");
 
 # %% [markdown]
-# Functions inside the ODE solver
-# ---------------- SOLUTES ----------------
+# ### Functions running inside the ODE Solver
 
 # %%
+# ---------------- SOLUTES ----------------
+
 "Diffusion at SWI (water–sediment interface) for a solute."
 @inline function diffuse_SWI(
     then_z1p::Float64,  # u[k+1]
@@ -55,7 +64,6 @@ include("modules/Params.jl");
     return D_var * (2.0*(then_z1p - then_z) + TR*(then_w - then_z)) / (z_res^2)
 end
 
-# %%
 @inline function G_series(Dw::Float64, Deff::Float64, phi0::Float64,
                           dbl::Float64, dz::Float64)::Float64
     δ  = dbl
@@ -64,7 +72,6 @@ end
     return 1.0 / (δ / Dw + Δ / (ϕ0 * Deff))   # [m/yr]
 end
 
-# %%
 """
 Top-cell diffusion tendency with clean 2-resistor SWI exchange.
 then_z1p = u[k+1] (cell 2), then_z = u[k] (cell 1), then_w = Cw
@@ -89,7 +96,6 @@ Returns mol m^-3 yr^-1 contribution (same units as your RHS).
 end
 
 
-# %%
 "Centered advection–diffusion drift term for a solute (interior)."
 @inline function advectsolute(
     then_z1p::Float64,  # u[k+1]
@@ -103,7 +109,6 @@ end
     return -(u_z - D_var*DFF) * (then_z1p - then_z1m) / (2.0*z_res)
 end
 
-# %%
 "Advection term at SWI for a solute."
 @inline function advectsolute_SWI(
     u_z::Float64,
@@ -118,7 +123,6 @@ end
     return  (u_z - D_var*DFF) * TR * (then_w - then_z) / (2.0*z_res)
 end
 
-# %%
 """
 SWI transport boundary contribution (the term that used to use TR/(2dz)*(Cw-C1)),
 but using the *2-resistor* SWI conductance to get a consistent pore-side SWI gradient.
@@ -150,13 +154,11 @@ DFF  : your dispersion/throughflow factor (as used before)
 end
 
 
-# %%
 "Irrigation exchange for a solute."
 @inline function irrigate(then_z::Float64, above::Float64, alpha_z::Float64)::Float64
     return alpha_z * (above - then_z)
 end
 
-# %%
 "Centered diffusion (interior) for a solute/solid."
 @inline function diffuse(
     then_z1m::Float64,  # u[k-1]
@@ -169,7 +171,6 @@ end
     return D_var * (then_z1p - 2.0*then_z + then_z1m) / (z_res^2)
 end
 
-# %%
 "Neumann (zero-gradient) diffusion at bottom boundary for a solute/solid."
 @inline function diffuse_BBC(
     then_z::Float64,     # u[end]
@@ -181,10 +182,8 @@ end
     return 2.0 * D_var * ((then_z1m - then_z) / (z_res^2))
 end
 
-# %% [markdown]
 # ---------------- SOLIDS ----------------
 
-# %%
 "Diffusion at SWI for a solid (includes throughflow term)."
 @inline function diffuseSolid_SWI(
     then_z1p::Float64,
@@ -201,7 +200,6 @@ end
                      (2.0*z_res) * (F - phiS*w*then_z) / (D_bio*phiS) ) / (z_res^2)
 end
 
-# %%
 "Advection at SWI for a solid."
 @inline function advectsolid_SWI(
     then_z::Float64,
@@ -222,7 +220,6 @@ end
                    ) / (2.0*z_res)
 end
 
-# %%
 "Centered advection for a solid (interior)."
 @inline function advectsolid(
     then_z::Float64,     # u[k]
@@ -238,7 +235,6 @@ end
     return -APPW_z * ( sigma1m_z*then_z1p + 2.0*sigma_z*then_z - sigma1p_z*then_z1m ) / (2.0*z_res)
 end
 
-# %%
 "Bottom boundary advection for a solid."
 @inline function advectsolid_BBC(
     then_z::Float64,    # u[end]
@@ -252,20 +248,17 @@ end
 end
 
 
-# %%
 function input_P(omegaCa, T)
     P = (0.9012882388755719 + 0.01814331*T - log(omegaCa)) / 0.00016455
     return P
 end
 
-# %%
 function input_omegaCa(P, T)
     omegaCa = exp(0.9012882388755719 + 0.01814331*T - 0.00016455*P)
     return omegaCa
 end
 
 
-# %%
 "Function to calculate the DBL thickness based on the current speed, following: Sulpis, O., Boudreau, B. P., Mucci, A., Jenkins, C., Trossman, D. S., Arbic, B. K., & Key, R. M. (2018). Current CaCO3 dissolution at the seafloor caused by anthropogenic CO2. Proceedings of the National Academy of Sciences, 115(46), 11700-11705."
 function DBL(U, T; constant_DBL=false, user_DBL=nothing)
     # temperature dependent friction velocity
@@ -294,7 +287,6 @@ function DBL(U, T; constant_DBL=false, user_DBL=nothing)
 end
 
 
-# %%
 "apparent bulk sediment diffusivity, from: McGinnis, D. F., Sommer, S., Lorke, A., Glud, R. N., & Linke, P. (2014). Quantifying tidally driven benthic oxygen exchange across permeable sediments: An aquatic eddy correlation study. Journal of Geophysical Research: Oceans, 119(10), 6918-6932."
 function Ksed(U, T, permeability)
     u_star=0.00136 - 2.19598542e-5*T + 2.35862843e-2 * U #mm/s, from: Sulpis, O., Boudreau, B. P., Mucci, A., Jenkins, C., Trossman, D. S., Arbic, B. K., & Key, R. M. (2018). Current CaCO3 dissolution at the seafloor caused by anthropogenic CO2. Proceedings of the National Academy of Sciences, 115(46), 11700-11705.
@@ -315,19 +307,16 @@ function Ksed(U, T, permeability)
     return [diff_tort(func) for func in param_funcs]
 end
 
-# %%
 # --- tuning knobs ---
 const HMIN = 1e-12     # clamp for H+ concentration (≈ pH 12 upper bound for [H+])
 const HMAX = 1.0       # clamp for H+ (≈ pH 0 lower bound)
 const ETA_ALK  = 1e-6  # relative tol to skip re-solving H
 const DALK_EPS = 1e-18 # guard for tiny derivatives
 
-# %%
 # convert helpers
 @inline to_kg(x, ρ) = x/ρ
 @inline to_m3(x, ρ) = x*ρ
 
-# %%
 # CO2-system constants on *kg* basis for Equilibrate.*
 @inline function chem_constants_kg(mp)
     ρ = mp.rho_sw
@@ -341,7 +330,6 @@ const DALK_EPS = 1e-18 # guard for tiny derivatives
     )
 end
 
-# %%
 # H_from_alk_m3: all inputs/outputs in mol/m^3; internally switches to kg for Equilibrate.*
 @inline function H_from_alk_m3(
     TA_m3::Float64, tCO2_m3::Float64, tNH4_m3::Float64, tPO4_m3::Float64,
@@ -398,7 +386,6 @@ end
     return to_m3(H, ρ)  # back to mol/m^3 for your RHS
 end
 
-# %%
 @inline function rates_wD!(
     r::AbstractVector{Float64}, mp::MP, k::Int,
     H::Float64,
@@ -474,7 +461,6 @@ end
     return nothing
 end
 
-# %%
 @inline function make_H_cache(dH_i, Nz::Int)
     if dH_i isa AbstractVector
         if length(dH_i) == Nz
@@ -488,12 +474,12 @@ end
     end
 end
 
-# %%
 @inline nz(x::T) where {T<:Real} = ifelse(x < zero(T), zero(T), x);
 
+# %% [markdown]
+# ### Parameters needed to run the model
 
 # %%
-# Parameters needed to run the model 
 @everywhere struct ModelParams
     zc
     phi
@@ -613,10 +599,8 @@ end
 end
 
 # %%
-
-# %%
 @everywhere begin   
-    function calculate_constants(T, U, P, Fpom, Fcalcite, Fpom_s, Fpom_f, kfast, kslow)
+    function calculate_constants(T, U, P, Fpom, Fcalcite, Fpom_s, Fpom_f, kfast, kslow, dO2_w_local)
         # sediment depth vector
         zc, dx, ze, r = Params.prepdepth_geometric(depthSed; dz_top=dz_top, dz_bot=dz_bot, Nz=Nz, r_max=1.10)
         z_resvec = dx
@@ -630,7 +614,6 @@ end
         # RC, RN, RP = Params.redfield(dtPO4_w, rho_sw)  # for P-variable ratios
         RC, RN, RP = Params.redfield()  # for constant, canonical Redfield values
         Mpom = Params.rmm_pom(RC, RN, RP)  # g/mol
-        println("Radi NOTE: using Mpom = $Mpom g/mol based on RC=$RC, RN=$RN, RP=$RP")
         Fpom_mol = Fpom / Mpom  # mol/m^2/a
         Fpoc = Fpom_mol * RC  # mol/m^2/a
         # Split total flux into fast-slow-refractory portions
@@ -651,7 +634,7 @@ end
         # Bioturbation (for solids)
         D_bio_0 = Params.D_bio_0(Fpoc)
         # ^[m2/a] surf bioturb coeff, Archer et al. (2002)
-        D_bio = Params.D_bio(zc, D_bio_0, lambda_b, dO2_w*rho_sw)
+        D_bio = Params.D_bio(zc, D_bio_0, lambda_b, dO2_w_local*rho_sw)
         # ^[m2/a] bioturb coeff, Archer et al (2002)
         delta_D_bio = Params.delta_D_bio(zc, D_bio, lambda_b)
 
@@ -703,7 +686,7 @@ end
         D_dCa_tort2 = Ksed(U, T, permeability)[12] ./ tort2
 
         # Irrigation (for solutes)
-        alpha_0 = Params.alpha_0(Fpoc, dO2_w*rho_sw)  # [/a] from Archer et al (2002)
+        alpha_0 = Params.alpha_0(Fpoc, dO2_w_local*rho_sw)  # [/a] from Archer et al (2002)
         alpha = Params.alpha(alpha_0, zc, lambda_i) # [/a] Archer et al (2002)
 
         # Species and temperature dependent DBL thickness
@@ -895,18 +878,18 @@ end
 end
 
 # %%
-# Set kfast and kslow, and get model_params
 kfast = Params.kfast(Fpom, Nz, Q10_primary, T, Tref)
 kslow = Params.kslow(Fpom, Nz, Q10_primary, T, Tref)
 
-# %%
-model_params=calculate_constants(T, U, P, Fpom, Fcalcite, Fpom_s, Fpom_f, kfast, kslow)
+model_params=calculate_constants(T, U, P, Fpom, Fcalcite, Fpom_s, Fpom_f, kfast, kslow, dO2_w)
 
 # %%
 const ParamsT = typeof(model_params) # or typeof(proto) if you prefer a separate proto
 
+# %% [markdown]
+# ### Prepare initial conditions and parameters for the DifferentialEquation.jl solver
+
 # %%
-# Prepare initial conditions and parameters for the DifferentialEquations.jl solver
 # Create variables to model
 #make a depth vector filled with the initial conditions from the setup file
 dO2 = fill(dO2_i*model_params.rho_sw, length(model_params.zc))
@@ -935,7 +918,6 @@ pS0 = fill(pS0_i, length(model_params.zc))
 pFeOH3_PO4 = fill(pFeOH3_PO4_i, length(model_params.zc))
 dH = fill(model_params.dH_i, length(model_params.zc))
 
-# %%
 #create an input matrix for the solver
 u0 = zeros(22, length(model_params.zc))
 u0[1, :] = dO2
@@ -961,16 +943,18 @@ u0[20, :]=pFeS2
 u0[21, :]=pS0
 u0[22, :]=pFeOH3_PO4
 
-
 # %%
 const RHS_CALLS = Threads.Atomic{Int}(0)
 const H_CALLS   = Threads.Atomic{Int}(0)
 
+# %% [markdown]
+# ### Differential equation solver
+
 # %%
-# Differential equation solver
 function physics_ensamble!(du, u , p ,t)
 
     mp = (p.model_params)::ParamsT     # <- one cast: everything below is inferred
+    dO2_w_local = p.dO2_w::Float64
 
     # --- aliases (typed) ---
     rho_sw  = mp.rho_sw::Float64
@@ -1040,7 +1024,7 @@ function physics_ensamble!(du, u , p ,t)
     FFeOH3::Float64     = Main.FFeOH3
 
     # precompute water-side values as plain Float64
-    O2w   = (dO2_w   * rho_sw)::Float64
+    O2w   = (dO2_w_local * rho_sw)::Float64
     tCO2w = (dtCO2_w * rho_sw)::Float64
     tNO3w = (dtNO3_w * rho_sw)::Float64
     tSO4w = (dtSO4_w * rho_sw)::Float64
@@ -1323,7 +1307,6 @@ function physics_ensamble!(du, u , p ,t)
 
         # --- BOTTOM layer (k = Nz) ---
 
-# %%
 @inbounds begin
                 k = Nz
 
@@ -1384,25 +1367,23 @@ function physics_ensamble!(du, u , p ,t)
 
 
         end
-
-# %%
+    
 end #end function
 
 # %%
-# Setup problem
 prob = ODEProblem(physics_ensamble!, u0, tspan, (
     T = T,
     U = U,
     P = P,
     Fpom = Fpom,
     Fcalcite = Fcalcite,
-    model_params = model_params
+    model_params = model_params,
+    dO2_w = dO2_w
 ))
 
 # %%
 using SparseArrays, LinearSolve, OrdinaryDiffEq
 
-# %%
 # Block-tridiagonal sparsity pattern (nvar per layer, Nz layers)
 function jac_prototype(mp; nvar=22)
     Nz = length(mp.zc)
@@ -1425,30 +1406,26 @@ function jac_prototype(mp; nvar=22)
     return sparse(rows, cols, ones(length(rows)), N, N)
 end
 
-# %%
 Jp = jac_prototype(model_params)
 
-# %%
 f  = ODEFunction(physics_ensamble!;
                  jac_prototype=Jp)   # let the solver keep/factor a matrix of this shape
 
-# %%
-prob = ODEProblem(f, u0, tspan, (model_params=model_params,))
+prob = ODEProblem(f, u0, tspan, (model_params=model_params, dO2_w=dO2_w,))
 # sol  = solve(prob,
 #             Rosenbrock23(autodiff=false);
 #              abstol=1e-6, reltol=1e-4, save_everystep=false, save_on=false, dense=false)
 
+# %% [markdown]
+# ### Parallel ensamble run
 
 # %%
-# Parallel ensemble run
 using DiffEqCallbacks
 
-# %% [markdown]
 # -----------------------------
 # SWI flux diagnostics (drop-in)
 # -----------------------------
 
-# %%
 """
 Return SWI diffusive exchange flux for a solute (positive upward, out of sediment),
 consistent with your TR_* series conductance formulation.
@@ -1463,7 +1440,6 @@ Units: if TR_* is in m/yr and C in mol/m^3, then J is mol/m^2/yr (same time basi
     return 1.0 / (δ/Dw + Δ/(ϕ0*Deff))  # m/yr
 end
 
-# %%
 @inline function J_swi_diff(C1::Float64, Cw::Float64,
                               Dw::Float64, Deff::Float64,
                               phi0::Float64, dbl::Float64, dz::Float64)
@@ -1471,7 +1447,6 @@ end
     return k * (C1 - Cw)  # mol m^-2 yr^-1, positive upward
 end
 
-# %%
 """
 Net irrigation exchange with the overlying water (positive upward, out of sediment),
 consistent with `irrigate(C, Cw, alpha) = alpha*(Cw - C)` used in the RHS.
@@ -1491,14 +1466,13 @@ function J_irr_net(u_var::AbstractVector{<:Real}, Cw::Float64,
     end
 end
 
-# %%
-function compute_swi_fluxes(u, mp)
+function compute_swi_fluxes(u, mp, dO2_w_local)
     ρ = mp.rho_sw
     phi0 = mp.phi[1]
     dz0 = mp.z_resvec[1]
 
     # water-side values (mol/m^3)
-    O2w   = Main.dO2_w   * ρ
+    O2w   = dO2_w_local * ρ
     tCO2w = Main.dtCO2_w * ρ
     tNO3w = Main.dtNO3_w * ρ
     tSO4w = Main.dtSO4_w * ρ
@@ -1595,27 +1569,22 @@ function compute_swi_fluxes(u, mp)
     return (Jdiff=Jdiff, Jirr=Jirr, Jnet=Jnet)
 end
 
-# %% [markdown]
 # -----------------------------
 # SavingCallback setup
 # -----------------------------
 
-# %%
 # Choose when to save diagnostics (in model time units; your notebook uses years)
 # Example: save every 0.1 yr. Adjust as needed.
 flux_saveat = 0.0:0.1:(Main.tspan[2])
 
-# %%
 flux_saved = SavedValues(Float64, Any)
 
-# %%
 flux_cb = SavingCallback(
-    (u, t, integrator) -> compute_swi_fluxes(u, integrator.p.model_params),
+    (u, t, integrator) -> compute_swi_fluxes(u, integrator.p.model_params, dO2_w),
     flux_saved;
     saveat = flux_saveat
 )
 
-# %%
 function refresh_H_cache_each_step!(u, t, integrator)
     mp = integrator.p.model_params
     Nz = size(u, 2)
@@ -1642,35 +1611,28 @@ function refresh_H_cache_each_step!(u, t, integrator)
     return nothing
 end
 
-# %%
 cb_refreshH_i = FunctionCallingCallback(refresh_H_cache_each_step!; func_everystep=true)
 
 
-# %%
 function commit_H_cache!(u, t, integrator)
     mp = integrator.p.model_params
     mp.H_cache .= mp.H_diag
     return nothing
 end
 
-# %%
 const cb_commitH = FunctionCallingCallback(commit_H_cache!;
     func_everystep = true,   # runs after each accepted step
 )
 
-
 # %%
-# Run the ensemble with callbacks
 using LinearAlgebra, SparseArrays, SparseDiffTools
 using LinearSolve, OrdinaryDiffEq, SciMLBase
 
-# %%
 # -----------------------------
 # 0) Threading / BLAS
 # -----------------------------
 BLAS.set_num_threads(1)  # avoid over-subscription with EnsembleThreads()
 
-# %%
 # -----------------------------
 # 1) Jacobian sparsity helper
 # -----------------------------
@@ -1697,7 +1659,6 @@ function jac_prototype(mp; nvar::Int=22)
     return sparse(rows, cols, ones(length(rows)), N, N)
 end
 
-# %%
 # Cache: (nvar, Nz) -> (Jp, colors)
 if !isdefined(@__MODULE__, :J_CACHE)
     const J_CACHE = Dict{Tuple{Int,Int},Tuple{SparseMatrixCSC{Float64,Int},Vector{Int}}}()
@@ -1706,7 +1667,6 @@ else
 end
 
 
-# %%
 function cached_jac(mp; nvar::Int=22)
     key = (nvar, length(mp.zc))
     get!(J_CACHE, key) do
@@ -1716,15 +1676,14 @@ function cached_jac(mp; nvar::Int=22)
     end
 end
 
-# %%
 # -----------------------------
 # 2) Build ICs exactly like your single run (mol/kg * rho_sw)
 # -----------------------------
-function make_u0_from_IC(mp)
+function make_u0_from_IC(mp, dO2_w_local)
     Nz = length(mp.zc)
     ρ = mp.rho_sw
     u0 = zeros(22, Nz)
-    u0[1, :] .= dO2_w * ρ
+    u0[1, :] .= dO2_w_local * ρ
     u0[2, :] .= dtCO2_w * ρ
     u0[3, :] .= dtNO3_w * ρ
     u0[4, :] .= dtSO4_w * ρ
@@ -1750,16 +1709,13 @@ function make_u0_from_IC(mp)
     return u0
 end
 
-# %% [markdown]
 # -----------------------------
 # 3) Build parameter sets
 # -----------------------------
 # Example: one trajectory; extend to N as needed
 
-# %% [markdown]
 # trajectories = 1  # or set explicitly
 
-# %% [markdown]
 # # Option A: hard-code levels here
 # T_levels        = [10.0, 20.0, 30.0]
 # Fpom_levels     = [0.01, 0.1, 1.0]
@@ -1767,7 +1723,6 @@ end
 # P_levels        = [5, 10, 15]          # keep fixed unless you want to vary
 # Fcalcite_levels = [1]   # keep fixed unless you want to vary
 
-# %% [markdown]
 # new_T = [11.7 + rand() * (12.8 - 11.7) for i in 1:trajectories]
 # new_U = [0.02 + rand() * (0.08 - 0.02) for i in 1:trajectories]
 # new_omegaCa = [2.5 + rand() * (5.0 - 2.5) for i in 1:trajectories]
@@ -1775,26 +1730,24 @@ end
 # new_Fpom = [26.0 + rand() * (55.0 - 26.0) for i in 1:trajectories]
 # new_Fcalcite = [0.2 + rand() * (0.8 - 0.2) for i in 1:trajectories]
 
-# %%
 T_levels        = @isdefined(factorial_T_levels)        ? factorial_T_levels        : [T]
 Fpom_levels     = @isdefined(factorial_Fpom_levels)     ? factorial_Fpom_levels     : [Fpom]
 U_levels        = @isdefined(factorial_U_levels)        ? factorial_U_levels        : [U]
 P_levels        = @isdefined(factorial_P_levels)        ? factorial_P_levels        : [P]
 Fcalcite_levels = @isdefined(factorial_Fcalcite_levels) ? factorial_Fcalcite_levels : [Fcalcite]
+O_levels        = @isdefined(factorial_O_levels) ? factorial_O_levels : [dO2_w]
 
-# %%
-grid = collect(Iterators.product(T_levels, U_levels, P_levels, Fpom_levels, Fcalcite_levels))
+grid = collect(Iterators.product(T_levels, U_levels, P_levels, Fpom_levels, Fcalcite_levels, O_levels))
 trajectories = length(grid)
 
-# %%
 # Keep your existing downstream structure
 new_T        = [g[1] for g in grid]
 new_U        = [g[2] for g in grid]
 new_P        = [g[3] for g in grid]
 new_Fpom     = [g[4] for g in grid]
 new_Fcalcite = [g[5] for g in grid]
+new_O_levels = [g[6] for g in grid]
 
-# %% [markdown]
 # new_T = 11.7 
 # new_U = 0.02 
 # new_omegaCa = 2.5
@@ -1802,18 +1755,16 @@ new_Fcalcite = [g[5] for g in grid]
 # new_Fpom = 26.0 
 # new_Fcalcite = 0.2 
 
-# %%
 # Fix a concrete params type
 proto = calculate_constants(
     new_T[1], new_U[1], new_P[1],
     new_Fpom[1], new_Fcalcite[1],
-    0.3, 0.7, 30.0, 0.05
+    0.3, 0.7, 30.0, 0.05, new_O_levels[1]
 )
 const ParamsT = typeof(proto)
 
-# %%
 # --- keep simple per-trajectory metadata (like before) ---
-const ParamMetaT = NamedTuple{(:T, :U, :P, :Fpom, :Fcalcite),NTuple{5,Float64}}
+const ParamMetaT = NamedTuple{(:T, :U, :P, :Fpom, :Fcalcite, :O),NTuple{6,Float64}}
 param_meta_list = Vector{ParamMetaT}(undef, trajectories)
 for i in 1:trajectories
     param_meta_list[i] = (
@@ -1822,31 +1773,28 @@ for i in 1:trajectories
         P=new_P[i],
         Fpom=new_Fpom[i],
         Fcalcite=new_Fcalcite[i],
+        O=new_O_levels[i],
     )
 end
 
-# %%
 model_params_list = Vector{ParamsT}(undef, trajectories)
 for i in 1:trajectories
     model_params_list[i] = calculate_constants(
         new_T[i], new_U[i], new_P[i],
         new_Fpom[i], new_Fcalcite[i],
-        0.2, 0.8, 18.0, 0.05
+        0.2, 0.8, 18.0, 0.05, new_O_levels[i]
     )
 end
 
-# %%
 # Prebuild u0 and p for all trajectories (no allocs in prob_func)
-u0_list = [make_u0_from_IC(model_params_list[i]) for i in 1:trajectories]
-p_list = [(model_params=model_params_list[i],) for i in 1:trajectories]
+u0_list = [make_u0_from_IC(model_params_list[i], new_O_levels[i]) for i in 1:trajectories]
+p_list = [(model_params=model_params_list[i], dO2_w=new_O_levels[i]) for i in 1:trajectories]
 
-# %%
 # Pre-warm/calc J-cache for all unique Nz (optional but nice)
 for mp in model_params_list
     cached_jac(mp)  # fills J_CACHE
 end
 
-# %%
 # -----------------------------
 # 4) Base problem (reused when Nz matches)
 # -----------------------------
@@ -1854,10 +1802,8 @@ mp0 = model_params_list[1]
 Jp0, colors0 = cached_jac(mp0)
 f0 = ODEFunction(physics_ensamble!; jac_prototype=Jp0, colorvec=colors0)
 
-# %%
 prob_base = ODEProblem(f0, u0_list[1], tspan, p_list[1])
 
-# %%
 # -----------------------------
 # 5) prob_func
 # -----------------------------
@@ -1869,18 +1815,16 @@ flux_saveat = vcat(
     9.0:1.0:Main.tspan[2]
     )
 
-# %%
 # One SavedValues per trajectory
 flux_saved = [SavedValues(Float64, Any) for _ in 1:trajectories]
 
-# %%
 prob_func = function (prob, i, repeat)
     mp   = model_params_list[i]
     u0_i = u0_list[i]
     p_i  = p_list[i]
 
     fcb = SavingCallback(
-        (u, t, integrator) -> compute_swi_fluxes(u, integrator.p.model_params),
+        (u, t, integrator) -> compute_swi_fluxes(u, integrator.p.model_params, integrator.p.dO2_w),
         flux_saved[i];
         saveat = flux_saveat
     )
@@ -1897,17 +1841,14 @@ prob_func = function (prob, i, repeat)
     end
 end
 
-# %%
 # -----------------------------
 # 5b) Super-light per-trajectory progress (thread-safe)
 # -----------------------------
 using Base.Threads: Atomic, atomic_add!
 
-# %%
 ENSEMBLE_BAR_LOCK = ReentrantLock()
 ENSEMBLE_DONE = Atomic{Int}(0)
 
-# %%
 function make_output_with_progress(total::Int)
     ENSEMBLE_DONE[] = 0
     t0 = time()
@@ -1941,10 +1882,8 @@ function make_output_with_progress(total::Int)
     end
 end
 
-# %%
 outf = make_output_with_progress(trajectories)
 
-# %%
 ens = EnsembleProblem(
     prob_base;
     prob_func=prob_func,
@@ -1952,7 +1891,6 @@ ens = EnsembleProblem(
     safetycopy=true
 )
 
-# %%
 # -----------------------------
 # 6) Algorithm + warm-up (unchanged)
 # -----------------------------
@@ -1962,21 +1900,17 @@ catch
     UMFPACKFactorization()
 end
 
-# %%
 alg = FBDF(autodiff=false, linsolve=linsolve_alg)
 
-# %%
 _ = solve(remake(prob_base); alg,
     abstol=1e-6, reltol=1e-4,
     save_everystep=true, save_on=false, dense=false)
 
 
-# %% [markdown]
 # -----------------------------
 # 7) Run ensemble (progress prints here)
 # -----------------------------
 
-# %%
 sols = solve(
     ens, alg, EnsembleThreads();
     trajectories=trajectories,
@@ -1985,12 +1919,14 @@ sols = solve(
 )
 
 # %%
+size(sols[1])
+sols[1].t
+
+# %%
 using DataFrames
 
-# %%
 const FLUX_CONV = 1000.0 / 365.25   # mol m^-2 yr^-1 -> mmol m^-2 d^-1
 
-# %%
 """
 Extract final flux diagnostics from one saved flux object.
 
@@ -2036,15 +1972,17 @@ U_vals        = [param_meta_list[i].U        for i in 1:length(param_meta_list)]
 P_vals        = [param_meta_list[i].P        for i in 1:length(param_meta_list)]
 Fpom_vals     = [param_meta_list[i].Fpom     for i in 1:length(param_meta_list)]
 Fcalcite_vals = [param_meta_list[i].Fcalcite for i in 1:length(param_meta_list)]
+O_vals        = [param_meta_list[i].O        for i in 1:length(param_meta_list)]
 omegaCa_vals  = [model_params_list[i].omegaCa for i in 1:length(model_params_list)]
 
-# %%
 df_fluxes[!, "T"] = T_vals
 df_fluxes[!, "U"] = U_vals
 df_fluxes[!, "P"] = P_vals
 df_fluxes[!, "Fpom"] = Fpom_vals
 df_fluxes[!, "Fcalcite"] = Fcalcite_vals
+df_fluxes[!, "O"] = O_vals
 df_fluxes[!, "omegaCa"] = omegaCa_vals;
+
 
 # %%
 flux_saved[1].t          # times
@@ -2057,6 +1995,42 @@ JAlk_diff = [v.Jdiff.Alk for v in flux_saved[1].saveval]
 JAlk_irr = [v.Jirr.Alk for v in flux_saved[1].saveval]
 JAlk_net = [v.Jnet.Alk for v in flux_saved[1].saveval]
 
+# %%
+hmap_matrix = vcat([d' for d in heatmap_data]...)
+size(hmap_matrix)
+# heatmap(sols[1].t, 1:size(heatmap_matrix, 2), hmap_matrix', xlabel="Time index", ylabel="Depth index", title="O₂ Profile Heatmap", yflip=true)
+heatmap(sols[1].t, model_params.zc, hmap_matrix', xlabel="Time (y)", ylabel="Depth (m))", title="O₂ Profile Heatmap", yflip=true)
+
+# plot(hmap_matrix', xlabel="Time index", ylabel="Depth index", title="O₂ Profile Heatmap")
+
+# %%
+size(sols[1].u[1])
+
+# Variable names in the same order used when populating u0[1:22, :].
+var_names = [
+    "dO2", "dtCO2", "dtNO3", "dtSO4", "dtPO4", "dtNH4", "dtH2S", "dFeII", "dMnII", "dCH4", "dalk", "dCa",
+    "pfoc", "psoc", "pFeOH3", "pMnO2", "pcalcite", "paragonite", "pFeS", "pFeS2", "pS0", "pFeOH3_PO4"
+ ]
+
+# Build one heatmap per variable index x = 1:22.
+heatmaps = Vector{Any}(undef, 22)
+for x in 1:22
+    hmap_data = [u[x, :] for u in sols[1].u]
+    hmap_matrix = vcat([d' for d in hmap_data]...)  # rows = time, columns = depth
+
+    hm = heatmap(
+        sols[1].t, model_params.zc, hmap_matrix',
+        xlabel="Time (y)",
+        ylabel="Depth (m)",
+        title="$(var_names[x]) Profile Heatmap",
+        yflip=true
+    )
+
+    heatmaps[x] = hm
+    display(hm)
+end
+
+heatmaps
 
 # %%
 matwrite("sols_all.mat", Dict(
@@ -2068,3 +2042,8 @@ matwrite("sols_all.mat", Dict(
     "Fcalcite_vals" => new_Fcalcite,
     "P_vals"        => new_P,
 ))
+
+# %%
+size(sols.u[1])
+pFeOH3_PO4_i
+
