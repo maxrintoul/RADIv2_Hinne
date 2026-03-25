@@ -1746,7 +1746,7 @@ new_U        = [g[2] for g in grid]
 new_P        = [g[3] for g in grid]
 new_Fpom     = [g[4] for g in grid]
 new_Fcalcite = [g[5] for g in grid]
-new_O_levels = [g[6] for g in grid]
+new_O = [g[6] for g in grid]
 
 # new_T = 11.7 
 # new_U = 0.02 
@@ -1759,7 +1759,7 @@ new_O_levels = [g[6] for g in grid]
 proto = calculate_constants(
     new_T[1], new_U[1], new_P[1],
     new_Fpom[1], new_Fcalcite[1],
-    0.3, 0.7, 30.0, 0.05, new_O_levels[1]
+    0.3, 0.7, 30.0, 0.05, new_O[1]
 )
 const ParamsT = typeof(proto)
 
@@ -1773,7 +1773,7 @@ for i in 1:trajectories
         P=new_P[i],
         Fpom=new_Fpom[i],
         Fcalcite=new_Fcalcite[i],
-        O=new_O_levels[i],
+        O=new_O[i],
     )
 end
 
@@ -1782,13 +1782,13 @@ for i in 1:trajectories
     model_params_list[i] = calculate_constants(
         new_T[i], new_U[i], new_P[i],
         new_Fpom[i], new_Fcalcite[i],
-        0.2, 0.8, 18.0, 0.05, new_O_levels[i]
+        0.2, 0.8, 18.0, 0.05, new_O[i]
     )
 end
 
 # Prebuild u0 and p for all trajectories (no allocs in prob_func)
-u0_list = [make_u0_from_IC(model_params_list[i], new_O_levels[i]) for i in 1:trajectories]
-p_list = [(model_params=model_params_list[i], dO2_w=new_O_levels[i]) for i in 1:trajectories]
+u0_list = [make_u0_from_IC(model_params_list[i], new_O[i]) for i in 1:trajectories]
+p_list = [(model_params=model_params_list[i], dO2_w=new_O[i]) for i in 1:trajectories]
 
 # Pre-warm/calc J-cache for all unique Nz (optional but nice)
 for mp in model_params_list
@@ -1996,14 +1996,6 @@ JAlk_irr = [v.Jirr.Alk for v in flux_saved[1].saveval]
 JAlk_net = [v.Jnet.Alk for v in flux_saved[1].saveval]
 
 # %%
-hmap_matrix = vcat([d' for d in heatmap_data]...)
-size(hmap_matrix)
-# heatmap(sols[1].t, 1:size(heatmap_matrix, 2), hmap_matrix', xlabel="Time index", ylabel="Depth index", title="O₂ Profile Heatmap", yflip=true)
-heatmap(sols[1].t, model_params.zc, hmap_matrix', xlabel="Time (y)", ylabel="Depth (m))", title="O₂ Profile Heatmap", yflip=true)
-
-# plot(hmap_matrix', xlabel="Time index", ylabel="Depth index", title="O₂ Profile Heatmap")
-
-# %%
 size(sols[1].u[1])
 
 # Variable names in the same order used when populating u0[1:22, :].
@@ -2041,6 +2033,7 @@ matwrite("sols_all.mat", Dict(
     "Fpom_vals"     => new_Fpom,
     "Fcalcite_vals" => new_Fcalcite,
     "P_vals"        => new_P,
+    "O_vals"        => new_O,
 ))
 
 # %%
