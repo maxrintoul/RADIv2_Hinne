@@ -17,4 +17,4 @@ cd $PBS_O_WORKDIR
 export JULIA_NUM_THREADS=48
 export OPENBLAS_NUM_THREADS=1
 
-julia --project=. 'include("runfile_ensemble.jl")'
+julia --project=. runfile_ensemble.jl
