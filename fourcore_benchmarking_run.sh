@@ -1,7 +1,7 @@
 #!/bin/bash
 #PBS -P jk72
 #PBS -q normal
-#PBS -l walltime=02:00:00
+#PBS -l walltime=06:00:00
 #PBS -l ncpus=4
 #PBS -l mem=16GB
 #PBS -l storage=scratch/jk72
