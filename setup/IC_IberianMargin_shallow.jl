@@ -6,7 +6,7 @@ dz_top=0.2e-3 # depth resolution at top of sediment
 dz_bot=5e-2 # depth resolution at bottom of sediment
 Nz=51  # number of depth layers
 
-tspan = (0.0, 100.0) # in years
+tspan = (0.0, 1.0) # in years
 
 # +
 # wave
@@ -110,4 +110,4 @@ factorial_Fpom_levels     = [33.52618867924528*0.1, 33.52618867924528, 33.526188
 factorial_U_levels        = [U]
 factorial_P_levels        = [P]
 factorial_Fcalcite_levels = [0.01, 0.1, 1.0]
-factorial_O_levels        = [0.3, 50, 100, 400]*1e-6
+factorial_O_levels        = [10, 20, 40, 80]*1e-6

@@ -1849,6 +1849,15 @@ using Base.Threads: Atomic, atomic_add!
 ENSEMBLE_BAR_LOCK = ReentrantLock()
 ENSEMBLE_DONE = Atomic{Int}(0)
 
+# Format seconds as HH:MM:SS
+fmt_hms(sec) = begin
+    s = Int(round(max(sec, 0.0)))
+    h = s ÷ 3600
+    m = (s % 3600) ÷ 60
+    ss = s % 60
+    lpad(h, 2, '0') * ":" * lpad(m, 2, '0') * ":" * lpad(ss, 2, '0')
+end
+
 function make_output_with_progress(total::Int)
     ENSEMBLE_DONE[] = 0
     t0 = time()
@@ -1870,7 +1879,8 @@ function make_output_with_progress(total::Int)
                 print("\r", bar, " ",
                     lpad(done, ndigits(total)), "/", total,
                     "  (", round(pct; digits=1), "%)  ",
-                    "ETA: ", round(eta; digits=1), "s")
+                    "Elapsed: ", fmt_hms(elapsed), "  ",
+                    "ETA: ", fmt_hms(eta))
                 flush(stdout)
                 if done == total
                     println()
@@ -1878,7 +1888,7 @@ function make_output_with_progress(total::Int)
             end
         end
 
-        return (sol, false)   # keep only final state (your current behavior)
+        return (sol, false)   # keep only final state
     end
 end
 
@@ -2025,9 +2035,14 @@ end
 heatmaps
 
 # %%
-matwrite("sols_all.mat", Dict(
-    "t"    => sols[1].t,
-    "u"    => cat([cat(sols[i].u..., dims=3) for i in 1:trajectories]..., dims=4),
+using Dates
+
+stamp = Dates.format(now(), "yyyymmdd_HHMMSS")   # e.g. 20260326_142530
+fname = "sols_all_$(stamp).mat"
+
+matwrite(fname, Dict(
+    "t"             => sols[1].t,
+    "u"             => cat([cat(sols[i].u..., dims=3) for i in 1:trajectories]..., dims=4),
     "T_vals"        => new_T,
     "U_vals"        => new_U,
     "Fpom_vals"     => new_Fpom,
@@ -2035,8 +2050,3 @@ matwrite("sols_all.mat", Dict(
     "P_vals"        => new_P,
     "O_vals"        => new_O,
 ))
-
-# %%
-size(sols.u[1])
-pFeOH3_PO4_i
-
