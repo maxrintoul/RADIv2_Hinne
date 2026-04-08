@@ -29,8 +29,8 @@ beta = 33.0  # sediment porosity-depth relationship parameter
 
 # Define characteristic depths
 lambda_b = 0.08  # for bioturbation / m
-lambda_f = 0.03  # for fast-degrading POC / m
-lambda_s = 1.0  # for slow-degrading POC / m
+# lambda_f = 0.03  # for fast-degrading POC / m
+# lambda_s = 1.0  # for slow-degrading POC / m
 lambda_i = 0.05  # for irrigation / m
 
 # Define overlying water column properties
@@ -96,8 +96,8 @@ pFeOH3_PO4_i = 0.0
 
 
 # Define dissolution scheme for CaCO3 (1 = base RADI, 2 = temp dependent dissolution)
-calcite_diss_scheme = 2
-aragonite_diss_scheme = 2
+calcite_diss_scheme = 1
+aragonite_diss_scheme = 1
 
 # Define Q10 for secondary reactions
 Q10_primary = 2.0 # typical value for biological processes - Fossing et al. (2004)
@@ -105,9 +105,9 @@ Q10_secondary = 3.8 # typical value for biological reactions - Fossing et al. (2
 Tref = 9.0 # reference temperature for Q10 / °C - Fossing et al. (2004)
 
 # Optional factorial controls
-factorial_T_levels        = [10.0]#, 30.0]
-factorial_Fpom_levels     = [33.52618867924528*0.1, 33.52618867924528, 33.52618867924528*10.0]
-factorial_U_levels        = [U]
-factorial_P_levels        = [P]
-factorial_Fcalcite_levels = [0.01, 0.1, 1.0]
-factorial_O_levels        = [10, 20, 40, 80]*1e-6
+# factorial_T_levels        = [10.0]#, 30.0]
+# factorial_Fpom_levels     = [33.52618867924528*0.1, 33.52618867924528, 33.52618867924528*10.0]
+# factorial_U_levels        = [U]
+# factorial_P_levels        = [P]
+# factorial_Fcalcite_levels = [0.01, 0.1, 1.0]
+# factorial_O_levels        = [10, 20, 40, 80]*1e-6

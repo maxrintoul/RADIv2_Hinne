@@ -391,6 +391,9 @@ function dissolve_precipitate_CaCO3(
         (OmegaCa > 1.0 + OMEGA_PRECIP_THR) ? (0.4075 * (OmegaCa - 1.0)^1.76) : 0.0
 
     # Aragonite does not precipitate in this scheme
+    # Rdiss_calcite = 0.5
+    # Rdiss_aragonite = 0.0
+    # Rprec_calcite = 0.0
     Rprec_aragonite = 0.0
 
     return Rdiss_calcite, Rdiss_aragonite, Rprec_calcite, Rprec_aragonite

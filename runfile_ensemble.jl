@@ -44,6 +44,8 @@ include("modules/Params.jl");
 
 # %%
 @everywhere include("setup/IC_IberianMargin_shallow.jl");
+# @everywhere include("setup/IC_HF2_shallow.jl");
+# @everywhere include("setup/IC_CS2_2_shallow.jl");
 
 # %% [markdown]
 # ### Functions running inside the ODE Solver
@@ -373,6 +375,10 @@ end
         end
 
         dAlk_dH = Equilibrate.dalk_dh(H, tCO2, alk_bor, cs.K1, cs.K2, cs.KB, cs.Kw)
+        # dAlk_dH = Equilibrate.dalk_dh(
+        #     H, tCO2, alk_bor, tNH4, cs.KNH3, cs.TF, cs.KF, tPO4, cs.KP1, cs.KP2, cs.KP3, dSi, cs.KSi, tSO4, cs.KSO4, tH2S, 
+        #     cs.KH2S, cs.K1, cs.K2, cs.KB, cs.Kw
+        # )
         if !isfinite(dAlk_dH) || abs(dAlk_dH) < DALK_EPS
             break
         end
@@ -475,6 +481,9 @@ end
 end
 
 @inline nz(x::T) where {T<:Real} = ifelse(x < zero(T), zero(T), x);
+
+# %% [markdown]
+#
 
 # %% [markdown]
 # ### Parameters needed to run the model
@@ -1566,7 +1575,22 @@ function compute_swi_fluxes(u, mp, dO2_w_local)
         Alk_eff_totalcorr = J_Alk - 2.0*J_tH2S - 2.0*J_FeII - 2.0*J_MnII
     )
 
-    return (Jdiff=Jdiff, Jirr=Jirr, Jnet=Jnet)
+    Nz_ = size(u, 2)
+
+
+    OmegaCa_profile = Vector{Float64}(undef, Nz_)
+    @inbounds for k in 1:Nz_
+        dCa_k   = max(u[12, k], 0.0)
+        dtCO2_k = max(u[2,  k], 0.0)
+        Hk      = clamp(mp.H_cache[k], HMIN, HMAX)
+        denom_k = mp.K1*mp.K2 + mp.K1*Hk + Hk*Hk
+        dCO3_k  = (dtCO2_k * mp.K1 * mp.K2) / denom_k
+        OmegaCa_profile[k] = dCa_k * dCO3_k / mp.KCa
+    end
+
+    H_profile = copy(mp.H_cache)
+
+    return (Jdiff=Jdiff, Jirr=Jirr, Jnet=Jnet, OmegaCa=OmegaCa_profile, H = H_profile)
 end
 
 # -----------------------------
@@ -1575,7 +1599,7 @@ end
 
 # Choose when to save diagnostics (in model time units; your notebook uses years)
 # Example: save every 0.1 yr. Adjust as needed.
-flux_saveat = 0.0:0.1:(Main.tspan[2])
+flux_saveat = 0.0:0.001:(Main.tspan[2])
 
 flux_saved = SavedValues(Float64, Any)
 
@@ -1601,7 +1625,7 @@ function refresh_H_cache_each_step!(u, t, integrator)
 
         Hk = H_from_alk_m3(
             dalkc, dtCO2c, dtNH4c, dtPO4c, dtSO4c, dtH2Sc, mp;
-            H0 = H0k, iters = 1, damp = 1.0
+            H0 = H0k, iters = 2, damp = 0.4
         )
 
         Hk = clamp(Hk, HMIN, HMAX)
@@ -1808,12 +1832,12 @@ prob_base = ODEProblem(f0, u0_list[1], tspan, p_list[1])
 # 5) prob_func
 # -----------------------------
 # Save times (choose what you want; years in your setup)
-# flux_saveat = 0.0:1.0:tspan[2]
-flux_saveat = vcat(
-    0.0:0.01:1.0, 
-    1.1:0.1:8.0, 
-    9.0:1.0:Main.tspan[2]
-    )
+flux_saveat = 0.0:0.001:tspan[2]
+# flux_saveat = vcat(
+#     0.0:0.01:1.0, 
+#     1.1:0.1:8.0, 
+#     9.0:1.0:Main.tspan[2]
+#     )
 
 # One SavedValues per trajectory
 flux_saved = [SavedValues(Float64, Any) for _ in 1:trajectories]
@@ -1826,11 +1850,14 @@ prob_func = function (prob, i, repeat)
     fcb = SavingCallback(
         (u, t, integrator) -> compute_swi_fluxes(u, integrator.p.model_params, integrator.p.dO2_w),
         flux_saved[i];
-        saveat = flux_saveat
+        save_everystep = true,
+        save_start = true,
+        save_end = true,
+        # saveat = flux_saveat
     )
 
     cb_refreshH_i = FunctionCallingCallback(refresh_H_cache_each_step!; func_everystep=true)
-    cb_i = CallbackSet(fcb, cb_refreshH_i)
+    cb_i = CallbackSet(cb_refreshH_i, fcb)
 
     if size(prob.u0, 2) == length(mp.zc)
         return remake(prob; u0=u0_i, p=p_i, callback=cb_i)
@@ -1914,7 +1941,7 @@ alg = FBDF(autodiff=false, linsolve=linsolve_alg)
 
 _ = solve(remake(prob_base); alg,
     abstol=1e-6, reltol=1e-4,
-    save_everystep=true, save_on=false, dense=false)
+    save_everystep=false, saveat=flux_saveat, save_on=false, dense=false)
 
 
 # -----------------------------
@@ -1925,7 +1952,7 @@ sols = solve(
     ens, alg, EnsembleThreads();
     trajectories=trajectories,
     abstol=1e-6, reltol=1e-3,
-    save_on=true, save_everystep=false, saveat = flux_saveat, save_start=false, save_end=true, dense=false,maxiters = 5_000_000, dtmin = 1e-12
+    save_on=true, save_everystep=false, saveat=flux_saveat, save_start=true, save_end=true, dense=false,maxiters = 5_000_000, dtmin = 1e-12
 )
 
 # %%
@@ -2040,13 +2067,106 @@ using Dates
 stamp = Dates.format(now(), "yyyymmdd_HHMMSS")   # e.g. 20260326_142530
 fname = "sols_all_$(stamp).mat"
 
-matwrite(fname, Dict(
-    "t"             => sols[1].t,
-    "u"             => cat([cat(sols[i].u..., dims=3) for i in 1:trajectories]..., dims=4),
-    "T_vals"        => new_T,
-    "U_vals"        => new_U,
-    "Fpom_vals"     => new_Fpom,
-    "Fcalcite_vals" => new_Fcalcite,
-    "P_vals"        => new_P,
-    "O_vals"        => new_O,
+# -- pack fluxes: each species -> (ntimes_flux x ntrajectories) matrix ---
+flux_t = flux_saved[1].t   # same time grid for all trajectories
+
+_pack_scalar(field, subfield) = hcat([
+    [getproperty(v[field], subfield) for v in flux_saved[i].saveval]
+    for i in 1:trajectories
+]...)   # -> (ntimes_flux, ntrajectories)
+
+jnet_species  = keys(flux_saved[1].saveval[1].Jnet)
+jdiff_species = keys(flux_saved[1].saveval[1].Jdiff)
+jirr_species  = keys(flux_saved[1].saveval[1].Jirr)
+
+Jnet_mat  = Dict("Jnet_$(String(sp))"  => _pack_scalar(:Jnet,  sp) for sp in jnet_species)
+Jdiff_mat = Dict("Jdiff_$(String(sp))" => _pack_scalar(:Jdiff, sp) for sp in jdiff_species)
+Jirr_mat  = Dict("Jirr_$(String(sp))"  => _pack_scalar(:Jirr,  sp) for sp in jirr_species)
+
+# --- OmegaCa:  (Nz x ntimes_flux x ntrajectories) ---
+OmegaCa_arr = cat([
+    hcat([v.OmegaCa for v in flux_saved[i].saveval]...)  # (Nz, ntimes_flux)
+    for i in 1:trajectories
+]..., dims=3)
+
+H_arr = cat([
+    hcat([v.H for v in flux_saved[i].saveval]...)
+    for i in 1:trajectories
+]..., dims=3)
+
+matwrite(fname, merge(
+    Dict(
+        "t"             => sols[1].t,
+        "u"             => cat([cat(sols[i].u..., dims=3) for i in 1:trajectories]..., dims=4),
+        "flux_t"        => flux_t,
+        "OmegaCa"       => OmegaCa_arr,
+        "H"             => H_arr,
+        "T_vals"        => new_T,
+        "U_vals"        => new_U,
+        "Fpom_vals"     => new_Fpom,
+        "Fcalcite_vals" => new_Fcalcite,
+        "P_vals"        => new_P,
+        "O_vals"        => new_O,
+        "zc"            => model_params_list[1].zc,
+        "S"             => S
+    ),
+    Jnet_mat,
+    Jdiff_mat,
+    Jirr_mat
 ))
+
+
+# %%
+pl = plot(sols[1].t, H_arr[1, :, 1], xlabel="Time (y)", ylabel="H (mol/m^3)", title="H at Surface Cell Over Time")
+
+display(pl)
+
+# %%
+# dalk at top sediment cell (k=1) through time
+alk = [1000.0 * u[11,1] for u in sols[1].u]
+dic = [1000.0 * u[2,1] for u in sols[1].u]  # convert from mol/m^3 to mmol/m^3
+pl = plot(sols[1].t, alk, label="dalk (k=1)",
+          xlabel="Time (y)", ylabel="Concentration (mol/m^3)",
+          title="Alkalinity Time Series")
+          plot!(sols[1].t, dic, label="dtCO2 (k=1)")
+display(pl)
+
+# %%
+# Get it all from CO2System.jl instead, with pH all on Free scale
+co2s_final = CO2System.CO2SYS(
+    alk,
+    dic,
+    1,
+    2,
+    S,
+    T,
+    T,
+    P,
+    P,
+    1e6dSi_w,
+    1e6dtPO4_i,
+    1e6dtNH4_i,
+    1e6dtH2S_i,
+    3,
+    10,
+    1,)[1]
+# K1 = co2s[1, 54][1] * rho_sw
+# K2 = co2s[1, 55][1] * rho_sw
+# Kw = co2s[1, 58][1] * rho_sw ^ 2
+# KB = co2s[1, 59][1] * rho_sw
+# KF = co2s[1, 60][1] * rho_sw
+# KSO4 = co2s[1, 61][1] * rho_sw
+# KP1 = co2s[1, 62][1] * rho_sw
+# KP2 = co2s[1, 63][1] * rho_sw
+# KP3 = co2s[1, 64][1] * rho_sw
+# KSi = co2s[1, 65][1] * rho_sw
+# KNH3 = co2s[1, 66][1] * rho_sw
+# KH2S = co2s[1, 67][1] * rho_sw
+# TB = co2s[1, 83][1] * 1e-6rho_sw
+# TF = co2s[1, 84][1] * 1e-6rho_sw
+# KCa = co2s[1, 86][1] * rho_sw ^ 2
+# KAr = co2s[1, 87][1] * rho_sw ^ 2
+# dH_i = @. (10.0 ^ -co2s[:, 35]) * rho_sw
+# dH_i = length(dH_i) == 1 ? dH_i[1] : dH_i
+
+final_H = @. (10.0 ^ -co2s_final[:, 35]) * rho_sw

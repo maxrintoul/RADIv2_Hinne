@@ -69,8 +69,71 @@ function dalk_dh(
     KB::Float64,
     Kw::Float64,
 )
-    -(TC * K1 * (h^2 + K1*K2 + 4h*K2) / (h^2 + K1*h + K1*K2)^2 +
+    dalk_total_dh = -(TC * K1 * (h^2 + K1*K2 + 4h*K2) / (h^2 + K1*h + K1*K2)^2 +
         borate_alk / (KB + h) + Kw / h^2 + 1.0)
+
+    # dalk_carb_dh = -(TC * K1 * (h^2 + K1*K2 + 4h*K2) / (h^2 + K1*h + K1*K2)^2)
+    # dalk_borate_dh = -borate_alk / (KB + h)
+    # dalk_ammonia_dh = -alk_ammonia(h, TNH3, KNH3) / (KNH3 + h) # derivative of alk_ammonia with respect to h
+    # dalk_fluoride_dh = -alk_fluoride(h, TF, KF) * KF / (h + KF)^2
+    # dalk_phosphate_dh = -TP *(KP1 * h^4 + 4 * KP1 * KP2 * h^3 +(KP1^2 * KP2 + 9 * KP1 * KP2 * KP3) * h^2 + 
+    #     4 * KP1^2 * KP2 * KP3 * h + 4 * KP1^2 * KP2^2 * KP3) /
+    #     (h^3 + KP1 * h^2 + KP1 * KP2 * h + KP1 * KP2 * KP3)^2 # derivative of alk_phosphate with respect to h
+    # dalk_silicate_dh = - (TSi * KSi) / (h + KSi)^2 # derivative of alk_silicate with respect to h
+    # dalk_sulfate_dh  = - (TSO4 * KSO4) / (h + KSO4)^2 # derivative of alk_sulfate with respect to h
+    # dalk_sulfide_dh = -alk_sulfide(h, TH2S, KH2S) / (KH2S + h) # derivative of alk_sulfide with respect to h
+    # dalk_water_dh = -Kw / h^2 - 1.0
+    # dalk_total_dh = dalk_carb_dh + dalk_borate_dh + dalk_ammonia_dh + dalk_fluoride_dh + dalk_phosphate_dh + 
+    #     dalk_silicate_dh + dalk_sulfate_dh + dalk_sulfide_dh + dalk_water_dh
+
+    return dalk_total_dh
+
+    
 end  # function dalk_dh
 
-end  # module Equilibrate
+# function dalk_dh(
+#     h::Float64,
+#     TC::Float64,
+#     borate_alk::Float64,
+#     TNH3::Float64,
+#     KNH3::Float64,
+#     TF::Float64,
+#     KF::Float64,
+#     TP::Float64,
+#     KP1::Float64,
+#     KP2::Float64,
+#     KP3::Float64,
+#     TSi::Float64,
+#     KSi::Float64,
+#     TSO4::Float64,
+#     KSO4::Float64,
+#     TH2S::Float64,
+#     KH2S::Float64,
+#     K1::Float64,
+#     K2::Float64,
+#     KB::Float64,
+#     Kw::Float64,
+# )
+#     # dalk_total_dh = -(TC * K1 * (h^2 + K1*K2 + 4h*K2) / (h^2 + K1*h + K1*K2)^2 +
+#     #     borate_alk / (KB + h) + Kw / h^2 + 1.0)
+
+#     dalk_carb_dh = -(TC * K1 * (h^2 + K1*K2 + 4h*K2) / (h^2 + K1*h + K1*K2)^2)
+#     dalk_borate_dh = -borate_alk / (KB + h)
+#     dalk_ammonia_dh = -alk_ammonia(h, TNH3, KNH3) / (KNH3 + h) # derivative of alk_ammonia with respect to h
+#     dalk_fluoride_dh = -alk_fluoride(h, TF, KF) * KF / (h + KF)^2
+#     dalk_phosphate_dh = -TP *(KP1 * h^4 + 4 * KP1 * KP2 * h^3 +(KP1^2 * KP2 + 9 * KP1 * KP2 * KP3) * h^2 + 
+#         4 * KP1^2 * KP2 * KP3 * h + 4 * KP1^2 * KP2^2 * KP3) /
+#         (h^3 + KP1 * h^2 + KP1 * KP2 * h + KP1 * KP2 * KP3)^2 # derivative of alk_phosphate with respect to h
+#     dalk_silicate_dh = - (TSi * KSi) / (h + KSi)^2 # derivative of alk_silicate with respect to h
+#     dalk_sulfate_dh  = - (TSO4 * KSO4) / (h + KSO4)^2 # derivative of alk_sulfate with respect to h
+#     dalk_sulfide_dh = -alk_sulfide(h, TH2S, KH2S) / (KH2S + h) # derivative of alk_sulfide with respect to h
+#     dalk_water_dh = -Kw / h^2 - 1.0
+#     dalk_total_dh = dalk_carb_dh + dalk_borate_dh + dalk_ammonia_dh + dalk_fluoride_dh + dalk_phosphate_dh + 
+#         dalk_silicate_dh + dalk_sulfate_dh + dalk_sulfide_dh + dalk_water_dh
+
+#     return dalk_total_dh
+
+    
+# end  # function dalk_dh
+
+end  # module Equilibratea
