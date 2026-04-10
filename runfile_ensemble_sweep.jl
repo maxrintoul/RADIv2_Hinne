@@ -26,7 +26,7 @@ Threads.nthreads()
 # %%
 using Distributed
 @everywhere using MAT
-@everywhere using DifferentialEquations, BenchmarkTools, ProgressLogging
+@everywhere using DifferentialEquations, ProgressLogging
 @everywhere using Plots; gr()
 @everywhere using JLD2
 using StaticArrays

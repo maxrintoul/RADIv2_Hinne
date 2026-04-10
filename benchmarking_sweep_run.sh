@@ -25,7 +25,7 @@
 
 module load julia/1.11.0
 
-cd $PBS_O_WORKDIR
+cd /home/581/mr9897/RADIv2_Hinne
 
 export JULIA_NUM_THREADS=${NCPUS}
 export OPENBLAS_NUM_THREADS=1
