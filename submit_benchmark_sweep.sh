@@ -14,7 +14,7 @@ DRY_RUN=${DRY_RUN:-0}
 # regardless of where the user runs submit_benchmark_sweep.sh from.
 # SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-echo $SCRIPT_DIR
+# echo $SCRIPT_DIR
 
 # ---- IC files (timespan controls steady-state approach) ---------------
 IC_FILES=(
