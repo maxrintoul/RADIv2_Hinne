@@ -77,6 +77,16 @@ for ic in "${IC_FILES[@]}"; do
             else
                 echo "Submitting: $tag"
                 echo "qsub -P jk72 -q normal -l walltime=${WALLTIME} -l ncpus=${ncpus} -l mem=${mem}GB -l storage=scratch/jk72 -N radi_${tag} -v "IC_FILE=${ic},ABSTOL=${abstol},RELTOL=${reltol},RUN_TAG=${tag}" "benchmarking_sweep_run.sh""
+                echo "qsub \
+                    -P jk72 \
+                    -q normal \
+                    -l walltime=${WALLTIME} \
+                    -l ncpus=${ncpus} \
+                    -l mem=${mem}GB \
+                    -l storage=scratch/jk72 \
+                    -N radi_${tag} \
+                    -v "IC_FILE=${ic},ABSTOL=${abstol},RELTOL=${reltol},RUN_TAG=${tag}" \
+                    "benchmarking_sweep_run.sh" "
                 qsub \
                     -P jk72 \
                     -q normal \
