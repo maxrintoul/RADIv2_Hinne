@@ -8,7 +8,7 @@
 # Dry-run (print qsub commands without submitting):
 #   DRY_RUN=1 ./submit_benchmark_sweep.sh
 
-DRY_RUN=1 #${DRY_RUN:-0}
+DRY_RUN=${DRY_RUN:-0}
 
 # Absolute path to this script's directory — so qsub finds the PBS script
 # regardless of where the user runs submit_benchmark_sweep.sh from.
@@ -76,6 +76,7 @@ for ic in "${IC_FILES[@]}"; do
                 echo "[DRY_RUN] qsub -N radi_${tag} -l ncpus=${ncpus} -l mem=${mem}GB -l walltime=${WALLTIME} -v NCPUS=${ncpus},MEM=${mem},IC_FILE=${ic},ABSTOL=${abstol},RELTOL=${reltol},RUN_TAG=${tag} benchmarking_sweep_run.sh"
             else
                 echo "Submitting: $tag"
+                echo "qsub -P jk72 -q normal -l walltime=${WALLTIME} -l ncpus=${ncpus} -l mem=${mem}GB -l storage=scratch/jk72 -N radi_${tag} -v "IC_FILE=${ic},ABSTOL=${abstol},RELTOL=${reltol},RUN_TAG=${tag}" "benchmarking_sweep_run.sh""
                 qsub \
                     -P jk72 \
                     -q normal \
