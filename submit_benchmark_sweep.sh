@@ -12,7 +12,7 @@ DRY_RUN=${DRY_RUN:-0}
 
 # Absolute path to this script's directory — so qsub finds the PBS script
 # regardless of where the user runs submit_benchmark_sweep.sh from.
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 echo $SCRIPT_DIR
 
@@ -69,7 +69,7 @@ for ic in "${IC_FILES[@]}"; do
                   -l "mem=${mem}GB" \
                   -l "walltime=${WALLTIME}" \
                   -v "NCPUS=${ncpus},MEM=${mem},IC_FILE=${ic},ABSTOL=${abstol},RELTOL=${reltol},RUN_TAG=${tag}" \
-                  "${SCRIPT_DIR}/benchmarking_sweep_run.sh"
+                  "benchmarking_sweep_run.sh"
             fi
             ((total++))
         done
