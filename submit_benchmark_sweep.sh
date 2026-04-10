@@ -59,17 +59,33 @@ for ic in "${IC_FILES[@]}"; do
 
             tag="${ic_tag}_${ncpus}c_${tol_label}"
 
+            # if [[ "$DRY_RUN" == "1" ]]; then
+            #     echo "[DRY_RUN] qsub -N radi_${tag} -l ncpus=${ncpus} -l mem=${mem}GB -l walltime=${WALLTIME} -v NCPUS=${ncpus},MEM=${mem},IC_FILE=${ic},ABSTOL=${abstol},RELTOL=${reltol},RUN_TAG=${tag} benchmarking_sweep_run.sh"
+            # else
+            #     echo "Submitting: $tag"
+            #     qsub \
+            #       -N "radi_${tag}" \
+            #       -l "ncpus=${ncpus}" \
+            #       -l "mem=${mem}GB" \
+            #       -l "walltime=${WALLTIME}" \
+            #       -v "NCPUS=${ncpus},MEM=${mem},IC_FILE=${ic},ABSTOL=${abstol},RELTOL=${reltol},RUN_TAG=${tag}" \
+            #       "benchmarking_sweep_run.sh"
+            # fi
+
             if [[ "$DRY_RUN" == "1" ]]; then
-                echo "[DRY_RUN] qsub -N radi_${tag} -l ncpus=${ncpus} -l mem=${mem}GB -l walltime=${WALLTIME} -v NCPUS=${ncpus},MEM=${mem},IC_FILE=${ic},ABSTOL=${abstol},RELTOL=${reltol},RUN_TAG=${tag} ${SCRIPT_DIR}/benchmarking_sweep_run.sh"
+                echo "[DRY_RUN] qsub -N radi_${tag} -l ncpus=${ncpus} -l mem=${mem}GB -l walltime=${WALLTIME} -v NCPUS=${ncpus},MEM=${mem},IC_FILE=${ic},ABSTOL=${abstol},RELTOL=${reltol},RUN_TAG=${tag} benchmarking_sweep_run.sh"
             else
                 echo "Submitting: $tag"
                 qsub \
-                  -N "radi_${tag}" \
-                  -l "ncpus=${ncpus}" \
-                  -l "mem=${mem}GB" \
-                  -l "walltime=${WALLTIME}" \
-                  -v "NCPUS=${ncpus},MEM=${mem},IC_FILE=${ic},ABSTOL=${abstol},RELTOL=${reltol},RUN_TAG=${tag}" \
-                  "benchmarking_sweep_run.sh"
+                    -P jk72 \
+                    -q normal \
+                    -l walltime=${WALLTIME} \
+                    -l ncpus=${ncpus} \
+                    -l mem=${mem}GB \
+                    -l storage=scratch/jk72 \
+                    -N radi_${tag} \
+                    -v "IC_FILE=${ic},ABSTOL=${abstol},RELTOL=${reltol},RUN_TAG=${tag}" \
+                    "benchmarking_sweep_run.sh"
             fi
             ((total++))
         done
