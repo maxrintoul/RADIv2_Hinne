@@ -39,7 +39,7 @@ echo "RELTOL   : ${RELTOL}"
 echo "Start    : $(date)"
 echo "========================================"
 
-time julia --project=. RADIv2_Hinne/runfile_ensemble_sweep.jl "${IC_FILE}" "${ABSTOL}" "${RELTOL}"
+time julia --project=. runfile_ensemble_sweep.jl "${IC_FILE}" "${ABSTOL}" "${RELTOL}"
 
 echo "========================================"
 echo "End      : $(date)"
