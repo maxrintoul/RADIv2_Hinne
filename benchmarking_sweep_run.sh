@@ -2,11 +2,13 @@
 #PBS -P jk72
 #PBS -q normal
 #PBS -l walltime=06:00:00
-#PBS -l ncpus=${NCPUS}
-#PBS -l mem=${MEM}GB
+#PBS -l ncpus=1
+#PBS -l mem=8GB
 #PBS -l storage=scratch/jk72
-#PBS -N radi_${RUN_TAG}
+#PBS -N radi_sweep
 #PBS -j oe
+# NOTE: ncpus, mem, walltime, and job name are overridden by qsub command-line
+# flags in submit_benchmark_sweep.sh. Values above are fallback placeholders only.
 
 # -------------------------------------------------------------------
 # Parametric PBS script for RADI sweep benchmarking.

@@ -14,8 +14,8 @@ DRY_RUN=${DRY_RUN:-0}
 IC_FILES=(
     "setup/IC_HF2_shallow_fact_1yr.jl"
     "setup/IC_HF2_shallow_fact_10yr.jl"
-    "setup/IC_HF2_shallow_fact_100yr.jl"
-    "setup/IC_HF2_shallow_fact_500yr.jl"
+    # "setup/IC_HF2_shallow_fact_100yr.jl"
+    # "setup/IC_HF2_shallow_fact_500yr.jl"
 )
 
 # ---- Core/memory pairs (ncpus mem_GB) ---------------------------------
@@ -31,13 +31,13 @@ CORE_CONFIGS=(
 # ---- Tolerance pairs (abstol reltol) ----------------------------------
 # Format: "abstol reltol"  label
 TOL_CONFIGS=(
-    "1e-6 1e-4 loose"
-    "1e-7 1e-5 medium"
-    "1e-8 1e-6 tight"
+    # "1e-6 1e-4 loose"
+    "1e-7/5 1e-5/5 medium"
+    # "1e-8 1e-6 tight"
 )
 
 # ---- Walltime (adjust if needed) -------------------------------------
-WALLTIME="06:00:00"
+WALLTIME="01:00:00"
 
 # ---- Submit ----------------------------------------------------------
 total=0
@@ -54,9 +54,12 @@ for ic in "${IC_FILES[@]}"; do
             tag="${ic_tag}_${ncpus}c_${tol_label}"
 
             cmd="qsub \
+  -N radi_${tag} \
+  -l ncpus=${ncpus} \
+  -l mem=${mem}GB \
   -l walltime=${WALLTIME} \
   -v NCPUS=${ncpus},MEM=${mem},IC_FILE=${ic},ABSTOL=${abstol},RELTOL=${reltol},RUN_TAG=${tag} \
-  benchmarking_sweep_run.sh"
+  ./benchmarking_sweep_run.sh"
 
             if [[ "$DRY_RUN" == "1" ]]; then
                 echo "[DRY_RUN] $cmd"
