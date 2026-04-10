@@ -96,8 +96,8 @@ pFeOH3_PO4_i = 0.0
 
 
 # Define dissolution scheme for CaCO3 (1 = base RADI, 2 = temp dependent dissolution)
-calcite_diss_scheme = 1
-aragonite_diss_scheme = 1
+calcite_diss_scheme = 2
+aragonite_diss_scheme = 2
 
 # Define Q10 for secondary reactions
 Q10_primary = 2.0 # typical value for biological processes - Fossing et al. (2004)

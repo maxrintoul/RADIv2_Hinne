@@ -1,0 +1,123 @@
+# RADI v2 Parameter Tuning Plan
+
+## Context
+
+- RADI v2 1D early diagenesis model, 22 state variables, Julia
+- Observational data: dtNO3, dtNH4, Ca, dtPO4, dtSO4, dFeII, dMnII, dtH2S, pFeS, pFeS2, POC, DIC, TA
+- Surface BCs: O2, NO3, T, S (measured — fix as BCs, not free parameters)
+- Site IC file: `setup/IC_IberianMargin_shallow.jl`
+
+---
+
+## Phase 1 — Fix physical/transport (not tunable, just set correctly)
+
+Pin to observations or well-established site knowledge before anything else. These control where every reaction front sits depth-wise.
+
+- **T, S, surface O₂, surface NO₃** → directly measured; set as BCs in the IC file
+- **Porosity profile** (`phi0`, `phiInf`, `beta`) → from core physical data or literature for the site
+- **Sedimentation rate / burial velocity** → controls advection term; known from age models
+- **`lambda_b`, `D_bio_0`** (bioturbation) → ²¹⁰Pb or ²³⁴Th profiles ideally; otherwise literature for the benthic environment
+
+Getting transport wrong shifts the depth of every reaction front — non-negotiable as step 1.
+
+---
+
+## Phase 2 — Organic matter input and degradation (the engine driving all redox)
+
+The POC profile and the NH₄ profile are the strongest constraints.
+
+- **`Fpom`, `Fpom_f`/`Fpom_s` fractions** → total POC flux and reactivity partitioning; tune until modelled POC profile matches observed
+- **`kfast`/`kslow`** — auto-computed from Fpoc but can be overridden; POC profile curvature constrains reactivity
+- **NH₄ magnitude at depth** → total N mineralised = total C mineralised × RN/RC; clean diagnostic for overall diagenetic intensity
+- **NO₃ + NH₄ together** → crossover depth constrains nitrification/denitrification balance (`kNH3_redox`, `KM_dtNO3`)
+
+---
+
+## Phase 3 — The redox ladder, top-down in TEA order
+
+Each TEA window must be right before the one below it makes sense (sequential Monod inhibition). Work energetically favourable → unfavourable:
+
+1. **O₂** — your BC; O₂ penetration depth set by aerobic respiration (Fpom + kfast)
+2. **NO₃** — depth of NO₃ reduction front + curvature → `KM_dtNO3`; balance with nitrification → `kNH3_redox`
+3. **Mn²⁺** — depth/magnitude of MnII peak → `FMnO2`, `KM_pMnO2`
+4. **Fe²⁺** — depth/magnitude of FeII peak → `FFeOH3`, `KM_pFeOH3`
+5. **SO₄/H₂S** — SO₄ depletion rate with depth → `KM_dtSO4`; H₂S magnitude sensitive to production rate + oxidation/precipitation sinks
+
+**Key coupling:** FeII and H₂S are not independent — FeS precipitation (`kpFeS_H2S_Fe`) is a simultaneous sink for both. Tune them together, not separately.
+
+---
+
+## Phase 4 — Sulfide mineral formation (pFeS, pFeS₂)
+
+Once dissolved FeII and H₂S profiles are approximately right:
+
+- **pFeS** → `kpFeS_H2S_Fe` (precipitation from FeII + H₂S), `kH2S_FeOOH_red` / `kH2S_FeOOH_PO4_red` (reductive dissolution as FeS source)
+- **pFeS₂** → `kpFeS2_FeS_S0` (Wachenheim path, dominant at low SO₄) and `kpFeS2_SO4_H2S_FeS` (Berner path)
+- FeS oxidation (`kFeS_ox`, `kFeS2_O2`) matters near the SWI if pFeS shoals toward the surface
+
+---
+
+## Phase 5 — PO₄ and Fe–P coupling
+
+PO₄ has multiple offsetting sources/sinks — tune after Phases 3–4 are stable:
+
+- **Organic matter mineralisation** → source; set by RN/RC (`Params.jl`) and Fpom
+- **Fe(OH)₃–PO₄ adsorption** → `kFeOH3_PO4_adsorp`; strong sink in the Fe reduction zone
+- **Reductive dissolution of Fe(OH)₃–PO₄** → `kH2S_FeOOH_PO4_red`; releases P when sulfide attacks iron oxides
+
+Diagnostic: subsurface PO₄ peak or kink near the Fe-reduction zone.
+
+---
+
+## Phase 6 — Carbonate system: DIC, TA, Ca (last)
+
+DIC and TA are the **integral signature of all redox reactions**. Every pathway has a different TA stoichiometry. If the redox ladder is wrong, DIC and TA are wrong for the wrong reasons.
+
+- **DIC profile** → once redox is right, DIC over/under-prediction points to CaCO₃ dissolution/production rates
+- **Ca profile** → most direct diagnostic for CaCO₃ dissolution; constrains `Fcalcite`/`Faragonite` (rain rate) and dissolution rate constants (`ETCH_PIT_RATE_CONSTANT`, `DEFECT_ASSISTED_RATE_CONSTANT`)
+- **TA** → check consistency with Ca (each mol CaCO₃ dissolved adds 2 eq TA); discrepancy after redox isolates the carbonate signal cleanly
+- Aragonite vs. calcite flux partition → Ca profile shape and whether dissolution is surface-focused (aragonite) vs. deeper (calcite)
+
+---
+
+## Stepwise Workflow
+
+| Step | Action | Key parameters | Check against |
+|------|--------|----------------|---------------|
+| 1 | Fix physical/transport | T, S, O₂, NO₃ BCs; phi0/phiInf/beta; lambda_b | — |
+| 2 | POC degradation | Fpom, Fpom_f/Fpom_s, kfast/kslow | POC profile, NH₄ at depth |
+| 3a | Nitrification/denitrification | KM_dtNO3, kNH3_redox | NO₃ and NH₄ crossover depth |
+| 3b | Mn reduction | FMnO2, KM_pMnO2 | MnII peak depth + magnitude |
+| 3c | Fe reduction | FFeOH3, KM_pFeOH3 | FeII peak depth + magnitude |
+| 3d | Sulfate reduction | KM_dtSO4 | SO₄ gradient, H₂S buildup |
+| 4 | Sulfide minerals | kpFeS_H2S_Fe, kpFeS2_FeS_S0, kpFeS2_SO4_H2S_FeS | pFeS, pFeS₂ profiles |
+| 5 | Phosphate | kFeOH3_PO4_adsorp, kH2S_FeOOH_PO4_red, RN/RC | dtPO4 profile shape |
+| 6 | Carbonates | Fcalcite, Faragonite, rate constants | Ca, then TA, then DIC |
+
+---
+
+## Convergence Criteria (per phase)
+
+- **After Phase 2:** POC profile within ~30%; NH₄ at depth within factor of 2
+- **After Phase 3:** NO₃ penetration depth ±1–2 cm; SO₄ gradient matches over top 20 cm
+- **After Phase 4:** pFeS and pFeS₂ peak depths and magnitudes match
+- **After Phase 5:** PO₄ peak/kink near Fe-reduction zone reproduced
+- **After Phase 6:** Ca change with depth within ~10%; DIC/TA co-vary correctly
+
+---
+
+## Further Considerations
+
+1. **Non-uniqueness of Fe–S–P coupling** — `FFeOH3`, `kH2S_FeOOH_red`, and `kFeOH3_PO4_adsorp` share the iron oxide pool. Tune them together in Phase 3c–5, not one at a time.
+
+2. **Q10 parameters** — `Q10_primary` (2.0) and `Q10_secondary` (3.8) shift relative rates of aerobic vs. anaerobic pathways. Only worth tuning if the T profile has significant depth gradients.
+
+3. **Ensemble vs. single-trajectory tuning** — the existing `Iterators.product` ensemble framework lets you sweep key parameters (`Fpom`, `FFeOH3`, `FMnO2`, etc.) in a factorial grid. Once a rough starting point is established, run targeted ensembles over Phase 2 × Phase 3 parameters rather than manual one-at-a-time tuning.
+
+---
+
+## Relevant Files
+
+- `setup/IC_IberianMargin_shallow.jl` — Fpom, flux BCs, T/S/O₂/NO₃, FMnO2, FFeOH3, Fcalcite, Faragonite, lambda_b, porosity params
+- `modules/React.jl` — all rate constants (kNH3_redox, kpFeS_H2S_Fe, KM_*, kH2S_FeOOH_*, CaCO₃ rate constants)
+- `modules/Params.jl` — RC, RN, RP Redfield ratios (important for NH₄ and PO₄ stoichiometry)

@@ -1,21 +1,23 @@
-# -*- coding: utf-8 -*-
-# ---
-# jupyter:
-#   jupytext:
-#     formats: ipynb,jl:percent
-#     text_representation:
-#       extension: .jl
-#       format_name: percent
-#       format_version: '1.3'
-#       jupytext_version: 1.19.1
-#   kernelspec:
-#     display_name: Julia 1.11.6
-#     language: julia
-#     name: julia-1.11
-# ---
+# runfile_ensemble_sweep.jl
+# HPC-friendly sweep version of runfile_ensemble.jl.
+# Usage:
+#   julia --project=. runfile_ensemble_sweep.jl [IC_FILE] [ABSTOL] [RELTOL]
+# Defaults:
+#   IC_FILE = setup/IC_CS2_2_shallow.jl
+#   ABSTOL  = 1e-7
+#   RELTOL  = 1e-5
 
-# %%
-#shows the number of threads available for JULIA. 
+# Parse command-line arguments (all optional with defaults)
+const _ic_file  = length(ARGS) >= 1 ? ARGS[1]                  : "setup/IC_CS2_2_shallow.jl"
+const abstol_v  = length(ARGS) >= 2 ? parse(Float64, ARGS[2]) : 1e-7
+const reltol_v  = length(ARGS) >= 3 ? parse(Float64, ARGS[3]) : 1e-5
+
+println("[sweep] IC file : ", _ic_file)
+println("[sweep] abstol  : ", abstol_v)
+println("[sweep] reltol  : ", reltol_v)
+println("[sweep] threads : ", Threads.nthreads())
+flush(stdout)
+
 Threads.nthreads()
 
 # %% [markdown]
@@ -45,10 +47,7 @@ include("modules/Params.jl");
 # %%
 # @everywhere include("setup/IC_IberianMargin_shallow.jl");
 # @everywhere include("setup/IC_HF2_shallow.jl");
-# @everywhere include("setup/IC_CS2_2_shallow.jl");
-
-@everywhere include("setup/IC_HF2_shallow_fact.jl");
-
+@everywhere include(_ic_file);
 
 # %% [markdown]
 # ### Functions running inside the ODE Solver
@@ -1715,7 +1714,7 @@ flux_saveat = 0.0:0.001:(Main.tspan[2])
 # Set `save_reaction_rates = true` to store a full depth profile of all reactions.
 # Warning: this can generate very large outputs when `reaction_rates_save_everystep = true`.
 save_reaction_rates = true
-reaction_rates_save_everystep = false
+reaction_rates_save_everystep = true
 reaction_rate_saveat = flux_saveat
 
 flux_saved = SavedValues(Float64, Any)
@@ -1991,8 +1990,7 @@ prob_func = function (prob, i, repeat)
     fcb = SavingCallback(
         (u, t, integrator) -> compute_swi_fluxes(u, integrator.p.model_params, integrator.p.dO2_w),
         flux_saved[i];
-        save_everystep = false,
-        saveat = flux_saveat,
+        save_everystep = true,
         save_start = true,
         save_end = true,
         # saveat = flux_saveat
@@ -2105,7 +2103,7 @@ end
 alg = FBDF(autodiff=false, linsolve=linsolve_alg)
 
 _ = solve(remake(prob_base); alg,
-    abstol=1e-7, reltol=1e-5,
+    abstol=abstol_v, reltol=reltol_v,
     save_everystep=false, saveat=flux_saveat, save_on=false, dense=false)
 
 
@@ -2116,8 +2114,8 @@ _ = solve(remake(prob_base); alg,
 sols = solve(
     ens, alg, EnsembleThreads();
     trajectories=trajectories,
-    abstol=1e-7/5, reltol=1e-4/5,
-    save_on=true, save_everystep=false, saveat=flux_saveat, save_start=true, save_end=true, dense=false,maxiters = 5_000_000, dtmin = 1e-12
+    abstol=abstol_v / 5, reltol=reltol_v / 5,
+    save_on=true, save_everystep=false, saveat=flux_saveat, save_start=true, save_end=true, dense=false, maxiters=5_000_000, dtmin=1e-12
 )
 
 # %%
@@ -2313,60 +2311,5 @@ matwrite(fname, merge(
 ))
 
 
-# %%
-pl = plot(sols[1].t, H_arr[1, :, 1], xlabel="Time (y)", ylabel="H (mol/m^3)", title="H at Surface Cell Over Time")
-
-display(pl)
-
-# %%
-# dalk at top sediment cell (k=1) through time
-alk = [1000.0 * u[11,1] for u in sols[1].u]
-dic = [1000.0 * u[2,1] for u in sols[1].u]  # convert from mol/m^3 to mmol/m^3
-pl = plot(sols[1].t, alk, label="dalk (k=1)",
-          xlabel="Time (y)", ylabel="Concentration (mol/m^3)",
-          title="Alkalinity Time Series")
-          plot!(sols[1].t, dic, label="dtCO2 (k=1)")
-display(pl)
-
-# %%
-# Get it all from CO2System.jl instead, with pH all on Free scale
-co2s_final = CO2System.CO2SYS(
-    alk,
-    dic,
-    1,
-    2,
-    S,
-    T,
-    T,
-    P,
-    P,
-    1e6dSi_w,
-    1e6dtPO4_i,
-    1e6dtNH4_i,
-    1e6dtH2S_i,
-    3,
-    10,
-    1,)[1]
-# K1 = co2s[1, 54][1] * rho_sw
-# K2 = co2s[1, 55][1] * rho_sw
-# Kw = co2s[1, 58][1] * rho_sw ^ 2
-# KB = co2s[1, 59][1] * rho_sw
-# KF = co2s[1, 60][1] * rho_sw
-# KSO4 = co2s[1, 61][1] * rho_sw
-# KP1 = co2s[1, 62][1] * rho_sw
-# KP2 = co2s[1, 63][1] * rho_sw
-# KP3 = co2s[1, 64][1] * rho_sw
-# KSi = co2s[1, 65][1] * rho_sw
-# KNH3 = co2s[1, 66][1] * rho_sw
-# KH2S = co2s[1, 67][1] * rho_sw
-# TB = co2s[1, 83][1] * 1e-6rho_sw
-# TF = co2s[1, 84][1] * 1e-6rho_sw
-# KCa = co2s[1, 86][1] * rho_sw ^ 2
-# KAr = co2s[1, 87][1] * rho_sw ^ 2
-# dH_i = @. (10.0 ^ -co2s[:, 35]) * rho_sw
-# dH_i = length(dH_i) == 1 ? dH_i[1] : dH_i
-
-final_H = @. (10.0 ^ -co2s_final[:, 35]) * rho_sw
-
-# %%
-co2s_final[:, 35]
+println("[sweep] Done. Output written to ", fname)
+flush(stdout)
