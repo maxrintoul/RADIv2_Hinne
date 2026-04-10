@@ -8,7 +8,7 @@
 # Dry-run (print qsub commands without submitting):
 #   DRY_RUN=1 ./submit_benchmark_sweep.sh
 
-DRY_RUN=${DRY_RUN:-0}
+DRY_RUN=1 #${DRY_RUN:-0}
 
 # Absolute path to this script's directory — so qsub finds the PBS script
 # regardless of where the user runs submit_benchmark_sweep.sh from.
