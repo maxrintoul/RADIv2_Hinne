@@ -10,6 +10,10 @@
 
 DRY_RUN=${DRY_RUN:-0}
 
+# Absolute path to this script's directory — so qsub finds the PBS script
+# regardless of where the user runs submit_benchmark_sweep.sh from.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # ---- IC files (timespan controls steady-state approach) ---------------
 IC_FILES=(
     "setup/IC_HF2_shallow_fact_1yr.jl"
@@ -32,7 +36,7 @@ CORE_CONFIGS=(
 # Format: "abstol reltol"  label
 TOL_CONFIGS=(
     # "1e-6 1e-4 loose"
-    "1e-7/5 1e-5/5 medium"
+    "2e-8 2e-6 medium"
     # "1e-8 1e-6 tight"
 )
 
@@ -53,19 +57,17 @@ for ic in "${IC_FILES[@]}"; do
 
             tag="${ic_tag}_${ncpus}c_${tol_label}"
 
-            cmd="qsub \
-  -N radi_${tag} \
-  -l ncpus=${ncpus} \
-  -l mem=${mem}GB \
-  -l walltime=${WALLTIME} \
-  -v NCPUS=${ncpus},MEM=${mem},IC_FILE=${ic},ABSTOL=${abstol},RELTOL=${reltol},RUN_TAG=${tag} \
-  ./benchmarking_sweep_run.sh"
-
             if [[ "$DRY_RUN" == "1" ]]; then
-                echo "[DRY_RUN] $cmd"
+                echo "[DRY_RUN] qsub -N radi_${tag} -l ncpus=${ncpus} -l mem=${mem}GB -l walltime=${WALLTIME} -v NCPUS=${ncpus},MEM=${mem},IC_FILE=${ic},ABSTOL=${abstol},RELTOL=${reltol},RUN_TAG=${tag} ${SCRIPT_DIR}/benchmarking_sweep_run.sh"
             else
                 echo "Submitting: $tag"
-                eval "$cmd"
+                qsub \
+                  -N "radi_${tag}" \
+                  -l "ncpus=${ncpus}" \
+                  -l "mem=${mem}GB" \
+                  -l "walltime=${WALLTIME}" \
+                  -v "NCPUS=${ncpus},MEM=${mem},IC_FILE=${ic},ABSTOL=${abstol},RELTOL=${reltol},RUN_TAG=${tag}" \
+                  "${SCRIPT_DIR}/benchmarking_sweep_run.sh"
             fi
             ((total++))
         done
