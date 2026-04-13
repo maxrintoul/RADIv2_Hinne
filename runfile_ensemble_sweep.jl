@@ -2230,6 +2230,13 @@ fname = "sols_all_$(stamp).mat"
 
 # -- pack fluxes: each species -> (ntimes_flux x ntrajectories) matrix ---
 flux_t = flux_saved[1].t   # same time grid for all trajectories
+flux_nmax = maximum(flux_lens)
+for i in 1:trajectories
+    if flux_lens[i] < flux_nmax
+        @warn "Trajectory $i saved only $(flux_lens[i])/$flux_nmax flux time points (aborted early?)"
+    end
+end
+flux_t = flux_saved[argmax(flux_lens)].t
 
 # _pack_scalar(field, subfield) = hcat([
 #     [getproperty(v[field], subfield) for v in flux_saved[i].saveval]
