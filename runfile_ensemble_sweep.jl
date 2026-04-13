@@ -1919,10 +1919,8 @@ new_O = [g[6] for g in grid]
 # new_Fcalcite = 0.2 
 
 # Fix a concrete params type
-proto = calculate_constants(
-    new_T[1], new_U[1], new_P[1],
-    new_Fpom[1], new_Fcalcite[1],
-    0.3, 0.7, 30.0, 0.05, new_O[1]
+proto = calculate_constants(new_T[1], new_U[1], new_P[1], new_Fpom[1], 
+    new_Fcalcite[1], Fpom_s, Fpom_f, kfast, kslow, dO2_w
 )
 const ParamsT = typeof(proto)
 
@@ -2204,25 +2202,25 @@ var_names = [
     "pfoc", "psoc", "pFeOH3", "pMnO2", "pcalcite", "paragonite", "pFeS", "pFeS2", "pS0", "pFeOH3_PO4"
  ]
 
-# Build one heatmap per variable index x = 1:22.
-heatmaps = Vector{Any}(undef, 22)
-for x in 1:22
-    hmap_data = [u[x, :] for u in sols[1].u]
-    hmap_matrix = vcat([d' for d in hmap_data]...)  # rows = time, columns = depth
+# # Build one heatmap per variable index x = 1:22.
+# heatmaps = Vector{Any}(undef, 22)
+# for x in 1:22
+#     hmap_data = [u[x, :] for u in sols[1].u]
+#     hmap_matrix = vcat([d' for d in hmap_data]...)  # rows = time, columns = depth
 
-    hm = heatmap(
-        sols[1].t, model_params.zc, hmap_matrix',
-        xlabel="Time (y)",
-        ylabel="Depth (m)",
-        title="$(var_names[x]) Profile Heatmap",
-        yflip=true
-    )
+#     hm = heatmap(
+#         sols[1].t, model_params.zc, hmap_matrix',
+#         xlabel="Time (y)",
+#         ylabel="Depth (m)",
+#         title="$(var_names[x]) Profile Heatmap",
+#         yflip=true
+#     )
 
-    heatmaps[x] = hm
-    display(hm)
-end
+#     heatmaps[x] = hm
+#     display(hm)
+# end
 
-heatmaps
+# heatmaps
 
 # %%
 using Dates
@@ -2233,10 +2231,20 @@ fname = "sols_all_$(stamp).mat"
 # -- pack fluxes: each species -> (ntimes_flux x ntrajectories) matrix ---
 flux_t = flux_saved[1].t   # same time grid for all trajectories
 
-_pack_scalar(field, subfield) = hcat([
-    [getproperty(v[field], subfield) for v in flux_saved[i].saveval]
-    for i in 1:trajectories
-]...)   # -> (ntimes_flux, ntrajectories)
+# _pack_scalar(field, subfield) = hcat([
+#     [getproperty(v[field], subfield) for v in flux_saved[i].saveval]
+#     for i in 1:trajectories
+# ]...)   # -> (ntimes_flux, ntrajectories)
+
+function _pack_scalar(field, subfield)
+    cols = map(1:trajectories) do i
+        vals = [getproperty(getproperty(v, field), subfield) for v in flux_saved[i].saveval]
+        n = length(vals)
+        n < flux_nmax && append!(vals, fill(NaN, flux_nmax - n))
+        vals
+    end
+    return hcat(cols...)
+end
 
 jnet_species  = keys(flux_saved[1].saveval[1].Jnet)
 jdiff_species = keys(flux_saved[1].saveval[1].Jdiff)
