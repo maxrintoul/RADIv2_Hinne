@@ -8,7 +8,7 @@
 #   RELTOL  = 1e-5
 
 # Parse command-line arguments (all optional with defaults)
-const _ic_file  = length(ARGS) >= 1 ? ARGS[1]                  : "setup/IC_CS2_2_shallow.jl"
+const _ic_file  = length(ARGS) >= 1 ? ARGS[1]                  : "setup/IC_HF2_shallow_fact_1yr.jl"
 const abstol_v  = length(ARGS) >= 2 ? parse(Float64, ARGS[2]) : 1e-7
 const reltol_v  = length(ARGS) >= 3 ? parse(Float64, ARGS[3]) : 1e-5
 
@@ -2225,18 +2225,50 @@ var_names = [
 # %%
 using Dates
 
+function resolve_output_dir()
+    # Optional explicit override, useful both locally and on HPC.
+    env_dir = get(ENV, "RADI_RESULTS_DIR", "")
+    if !isempty(env_dir)
+        mkpath(env_dir)
+        return env_dir
+    end
+
+    gadi_dir = "/scratch/jk72/mr9897/RADI_Hinne_results"
+    host = lowercase(get(ENV, "HOSTNAME", ""))
+    on_gadi = occursin("gadi", host) || haskey(ENV, "PBS_JOBID") || haskey(ENV, "PBS_O_WORKDIR")
+
+    if on_gadi && isdir("/scratch")
+        mkpath(gadi_dir)
+        return gadi_dir
+    end
+
+    return pwd()
+end
+
 stamp = Dates.format(now(), "yyyymmdd_HHMMSS")   # e.g. 20260326_142530
 fname = "sols_all_$(stamp).mat"
+out_dir = resolve_output_dir()
+out_path = joinpath(out_dir, fname)
 
 # -- pack fluxes: each species -> (ntimes_flux x ntrajectories) matrix ---
-flux_t = flux_saved[1].t   # same time grid for all trajectories
+# Pad shorter trajectories with NaN so output is always (flux_nmax, trajectories).
+# Trajectories that hit dtmin abort early and produce fewer saved values.
+flux_lens = [length(flux_saved[i].t) for i in 1:trajectories]
 flux_nmax = maximum(flux_lens)
 for i in 1:trajectories
     if flux_lens[i] < flux_nmax
         @warn "Trajectory $i saved only $(flux_lens[i])/$flux_nmax flux time points (aborted early?)"
     end
 end
-flux_t = flux_saved[argmax(flux_lens)].t
+flux_t = hcat([
+    begin
+        ti = collect(flux_saved[i].t)
+        ni = length(ti)
+        ni < flux_nmax && append!(ti, fill(NaN, flux_nmax - ni))
+        ti
+    end
+    for i in 1:trajectories
+]...)
 
 # _pack_scalar(field, subfield) = hcat([
 #     [getproperty(v[field], subfield) for v in flux_saved[i].saveval]
@@ -2262,29 +2294,49 @@ Jdiff_mat = Dict("Jdiff_$(String(sp))" => _pack_scalar(:Jdiff, sp) for sp in jdi
 Jirr_mat  = Dict("Jirr_$(String(sp))"  => _pack_scalar(:Jirr,  sp) for sp in jirr_species)
 
 # --- OmegaCa:  (Nz x ntimes_flux x ntrajectories) ---
-OmegaCa_arr = cat([
-    hcat([v.OmegaCa for v in flux_saved[i].saveval]...)  # (Nz, ntimes_flux)
-    for i in 1:trajectories
-]..., dims=3)
+# OmegaCa_arr = cat([
+#     hcat([v.OmegaCa for v in flux_saved[i].saveval]...)  # (Nz, ntimes_flux)
+#     for i in 1:trajectories
+# ]..., dims=3)
 
-H_arr = cat([
-    hcat([v.H for v in flux_saved[i].saveval]...)
-    for i in 1:trajectories
-]..., dims=3)
+# H_arr = cat([
+#     hcat([v.H for v in flux_saved[i].saveval]...)
+#     for i in 1:trajectories
+# ]..., dims=3)
+
+function _pack_profile(field; saved=flux_saved, nmax=flux_nmax)
+    Nz_ = length(getproperty(saved[1].saveval[1], field))
+    slabs = map(1:trajectories) do i
+        mat = hcat([getproperty(v, field) for v in saved[i].saveval]...)  # (Nz_, ntimes_i)
+        n = size(mat, 2)
+        n < nmax && (mat = hcat(mat, fill(NaN, Nz_, nmax - n)))
+        mat
+    end
+    return cat(slabs..., dims=3)
+end
+
+OmegaCa_arr = _pack_profile(:OmegaCa)
+H_arr       = _pack_profile(:H)
 
 reaction_export = Dict{String,Any}()
 if save_reaction_rates && reaction_saved !== nothing && !isempty(reaction_saved[1].saveval)
-    reaction_t = reaction_saved[1].t
+    reaction_lens = [length(reaction_saved[i].t) for i in 1:trajectories]
+    reaction_nmax = maximum(reaction_lens)
+    reaction_t = reaction_saved[argmax(reaction_lens)].t
 
-    _pack_reaction(group, field) = cat([
-        hcat([getproperty(getproperty(v, group), field) for v in reaction_saved[i].saveval]...)
-        for i in 1:trajectories
-    ]..., dims=3)  # (Nz, ntimes_reaction, ntrajectories)
+    _pack_reaction(group, field) = cat(map(1:trajectories) do i
+        mat = hcat([getproperty(getproperty(v, group), field) for v in reaction_saved[i].saveval]...)
+        n = size(mat, 2)
+        n < reaction_nmax && (mat = hcat(mat, fill(NaN, size(mat, 1), reaction_nmax - n)))
+        mat
+    end..., dims=3)  # (Nz, ntimes_reaction, ntrajectories)
 
-    _pack_carbonate(field) = cat([
-        hcat([getproperty(v.carbonate, field) for v in reaction_saved[i].saveval]...)
-        for i in 1:trajectories
-    ]..., dims=3)
+    _pack_carbonate(field) = cat(map(1:trajectories) do i
+        mat = hcat([getproperty(v.carbonate, field) for v in reaction_saved[i].saveval]...)
+        n = size(mat, 2)
+        n < reaction_nmax && (mat = hcat(mat, fill(NaN, size(mat, 1), reaction_nmax - n)))
+        mat
+    end..., dims=3)
 
     reaction_names = keys(reaction_saved[1].saveval[1].reactions)
     rate_names = keys(reaction_saved[1].saveval[1].rates)
@@ -2303,7 +2355,7 @@ if save_reaction_rates && reaction_saved !== nothing && !isempty(reaction_saved[
     )
 end
 
-matwrite(fname, merge(
+matwrite(out_path, merge(
     Dict(
         "t"             => sols[1].t,
         "u"             => cat([cat(sols[i].u..., dims=3) for i in 1:trajectories]..., dims=4),
@@ -2326,5 +2378,5 @@ matwrite(fname, merge(
 ))
 
 
-println("[sweep] Done. Output written to ", fname)
+println("[sweep] Done. Output written to ", out_path)
 flush(stdout)
