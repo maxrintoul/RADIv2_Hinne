@@ -2224,6 +2224,7 @@ var_names = [
 
 # %%
 using Dates
+using UUIDs
 
 function resolve_output_dir()
     # Optional explicit override, useful both locally and on HPC.
@@ -2245,10 +2246,20 @@ function resolve_output_dir()
     return pwd()
 end
 
-stamp = Dates.format(now(), "yyyymmdd_HHMMSS")   # e.g. 20260326_142530
-fname = "sols_all_$(stamp).mat"
 out_dir = resolve_output_dir()
-out_path = joinpath(out_dir, fname)
+
+function make_unique_output_path(out_dir::AbstractString)
+    # Include multiple independent entropy sources so concurrent jobs never collide.
+    stamp = Dates.format(now(), "yyyymmdd_HHMMSS_sss")
+    raw_jobid = get(ENV, "PBS_JOBID", "nojid")
+    jobid = replace(raw_jobid, r"[^A-Za-z0-9_-]+" => "-")
+    pid = getpid()
+    token = string(uuid4())
+    fname = "sols_all_$(stamp)_job$(jobid)_pid$(pid)_$(token).mat"
+    return joinpath(out_dir, fname)
+end
+
+out_path = make_unique_output_path(out_dir)
 
 # -- pack fluxes: each species -> (ntimes_flux x ntrajectories) matrix ---
 # Pad shorter trajectories with NaN so output is always (flux_nmax, trajectories).
