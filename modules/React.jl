@@ -384,11 +384,22 @@ function dissolve_precipitate_CaCO3(
 
 
             
-
+    if calcite_prec_scheme == 1
 
     # Calcite precipitation (Zuddas & Mucci 1998), normalized to 4 m^2 g^-1
     Rprec_calcite =
         (OmegaCa > 1.0 + OMEGA_PRECIP_THR) ? (0.4075 * (OmegaCa - 1.0)^1.76) : 0.0
+
+    elseif calcite_prec_scheme == 2
+        # Temperature dependent calcite precipitation from fitting the data within Burton and Walter 
+        if OmegaCa > 1.0 + OMEGA_PRECIP_THR
+            k_precip_calcite = 29.024 * (5.493 * 1e-5 * T^2 - 3.466 * 1e-3 * T + 6.636 * 1e-2)
+            eta_precip_calcite = 5.434 * 1e-2 * T + 0.386
+            Rprec_calcite = k_precip_calcite * (OmegaCa - 1.0)^eta_precip_calcite
+        else
+            Rprec_calcite = 0.0
+        end
+    end
 
     # Aragonite does not precipitate in this scheme
     # Rdiss_calcite = 0.0
