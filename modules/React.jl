@@ -306,7 +306,8 @@ function dissolve_precipitate_CaCO3(
     KAr::Float64,
     T,
     calcite_diss_scheme::Integer = 2,
-    aragonite_diss_scheme::Integer = 2
+    aragonite_diss_scheme::Integer = 2,
+    calcite_prec_scheme::Integer = 2,
 )
     # Saturation states
     OmegaCa = dCa * dCO3 / KCa
@@ -420,7 +421,7 @@ function getreactions(
     dtNH4::Float64, dtH2S::Float64, dFeII::Float64, dMnII::Float64, dCH4::Float64, 
     dtPO4::Float64, pFeOH3_PO4::Float64, pFeS::Float64, pS0::Float64, pFeS2::Float64,
     pfoc_kfast::Float64, psoc_kslow::Float64,
-    pcalcite::Float64, paragonite::Float64, dCa::Float64, dCO3::Float64, KCa::Float64, KAr::Float64, T::Float64, calcite_diss_scheme::Integer, aragonite_diss_scheme::Integer, Q10_secondary::Float64, Tref::Float64
+    pcalcite::Float64, paragonite::Float64, dCa::Float64, dCO3::Float64, KCa::Float64, KAr::Float64, T::Float64, calcite_diss_scheme::Integer, aragonite_diss_scheme::Integer, calcite_prec_scheme::Integer, Q10_secondary::Float64, Tref::Float64
 )
     Rfast_dO2, Rslow_dO2, Rfast_dtNO3, Rslow_dtNO3, Rfast_pMnO2, Rslow_pMnO2,
     Rfast_pFeOH3, Rslow_pFeOH3, Rfast_dtSO4, Rslow_dtSO4, Rfast_dCH4, Rslow_dCH4,
@@ -434,7 +435,7 @@ function getreactions(
         redox(dO2, dtNH4, dtH2S, dFeII, dMnII, dCH4, dtSO4, pFeOH3, pMnO2, dtPO4, pFeOH3_PO4, pFeS, pS0, pFeS2, Q10_secondary, T, Tref)
 
     Rdiss_calcite, Rdiss_aragonite, Rprec_calcite, Rprec_aragonite =
-        dissolve_precipitate_CaCO3(pcalcite, paragonite, dCa, dCO3, KCa, KAr, T, calcite_diss_scheme, aragonite_diss_scheme)
+        dissolve_precipitate_CaCO3(pcalcite, paragonite, dCa, dCO3, KCa, KAr, T, calcite_diss_scheme, aragonite_diss_scheme, calcite_prec_scheme)
 
     return (Rfast_dO2, Rslow_dO2, Rfast_dtNO3, Rslow_dtNO3,
             Rfast_pMnO2, Rslow_pMnO2, Rfast_pFeOH3, Rslow_pFeOH3,
@@ -464,6 +465,7 @@ function reactions2rates(
     Rdiss_calcite::Float64, Rdiss_aragonite::Float64,
     Rprec_calcite::Float64, Rprec_aragonite::Float64,
     phiS_phi_z::Float64, RC::Float64, RN::Float64, RP::Float64,
+    dalk_alloch_prop::Float64, dalk_aerob_prop::Float64, dalk_anaerob_prop::Float64, dalk_carb_prop::Float64
 )
     # Convenience sums
     Rdeg_dO2    = Rfast_dO2    + Rslow_dO2
@@ -511,32 +513,65 @@ function reactions2rates(
                         (RN - RP + 4.0RC)    *  Rdeg_pMnO2 +
                         (RN - RP + 8.0RC)    *  Rdeg_pFeOH3 +
                         (RN - RP + 1.0RC)    *  Rdeg_dtSO4 +
-                        2.0                  *  Rdiss_CaCO3 ) +
-               2.0 * R_CH4_SO4redox -
-               2.0 * (R_dMnII + R_dFeII + R_dNH3 + R_dH2S) - 
-               2.0 * p2d * R_Fe_MnO2_red + 
-               4.0 * p2d * R_H2S_FeOOH_PO4_red +
-               4.0 * p2d * R_H2S_FeOOH_red -
-               2.0 * p2d * R_H2S_MnO2_red -
-               2.0 * d2p * R_FeS_H2S_Fe +
-               2.0 * d2p * R_FeS2_SO4_H2S_FeS - 
-               4.0 * p2d * R_FeS2_O2
+                        2.0                  *  (Rdiss_calcite + Rdiss_aragonite - Rprec_calcite  - Rprec_aragonite) ) +
+                2.0 * R_CH4_SO4redox + 
+                - 2.0 * (R_dMnII + R_dFeII + R_dNH3 + R_dH2S)  + 
+                - 2.0 * p2d * R_Fe_MnO2_red + 
+                4.0 * p2d * R_H2S_FeOOH_PO4_red +
+                4.0 * p2d * R_H2S_FeOOH_red + 
+                - 2.0 * p2d * R_H2S_MnO2_red + 
+                - 2.0 * d2p * R_FeS_H2S_Fe +
+                2.0 * d2p * R_FeS2_SO4_H2S_FeS +
+                - 4.0 * p2d * R_FeS2_O2
+
+    alk_consumption = - p2d * 2.0 * (Rprec_calcite + Rprec_aragonite)  - 2.0 * (R_dMnII + R_dFeII + R_dNH3 + R_dH2S) - 2.0 * p2d * R_Fe_MnO2_red - 2.0 * p2d * R_H2S_MnO2_red - 2.0 * d2p * R_FeS_H2S_Fe - 4.0 * p2d * R_FeS2_O2
+
+    # if Rdiss_CaCO3 > 0.0
+    #     alk_consumption = 2.0 * (R_dMnII + R_dFeII + R_dNH3 + R_dH2S + p2d * R_Fe_MnO2_red + 
+    #         p2d * R_H2S_MnO2_red  + d2p * R_FeS_H2S_Fe + 2.0 * p2d * R_FeS2_O2)
+    # else
+    #     alk_consumption = 2.0 * (R_dMnII + R_dFeII + R_dNH3 + R_dH2S + p2d * R_Fe_MnO2_red + 
+    #         p2d * R_H2S_MnO2_red  + d2p * R_FeS_H2S_Fe + 2.0 * p2d * R_FeS2_O2) - 2.0 * p2d * Rdiss_CaCO3
+    # end
+
+    # rate_dalk_alloch = 0.0
+    # rate_dalk_aerob = 0.0
+    # rate_dalk_anaerob = 0.0
+    # rate_dalk_carb = 0.0
+
+    rate_dalk_alloch = + dalk_alloch_prop * alk_consumption
+    # rate_dalk_alloch = + alk_consumption # - p2d * 2.0 * (Rprec_calcite + Rprec_aragonite)  - 2.0 * (R_dMnII + R_dFeII + R_dNH3 + R_dH2S) - 2.0 * p2d * R_Fe_MnO2_red - 2.0 * p2d * R_H2S_MnO2_red - 2.0 * d2p * R_FeS_H2S_Fe - 4.0 * p2d * R_FeS2_O2
+    rate_dalk_aerob = p2d * ( (RN - RP) * (Rdeg_dO2 + Rdeg_dCH4) ) + dalk_aerob_prop * alk_consumption
+    rate_dalk_anaerob = p2d * ((RN - RP + 0.8RC)    *  Rdeg_dtNO3 +
+                        (RN - RP + 4.0RC)    *  Rdeg_pMnO2 +
+                        (RN - RP + 8.0RC)    *  Rdeg_pFeOH3 +
+                        (RN - RP + 1.0RC)    *  Rdeg_dtSO4) + 
+                        2.0 * R_CH4_SO4redox +  4.0 * p2d * R_H2S_FeOOH_PO4_red + 
+                        4.0 * p2d * R_H2S_FeOOH_red + 2.0 * d2p * R_FeS2_SO4_H2S_FeS + dalk_anaerob_prop * alk_consumption
+    rate_dalk_carb = 2.0 * p2d * (Rdiss_calcite + Rdiss_aragonite) + dalk_carb_prop * alk_consumption
+
+    # if Rdiss_CaCO3 > 0.0
+    #     rate_dalk_carb = p2d * 2.0 * Rdiss_CaCO3 - dalk_carb_prop * alk_consumption
+    # else
+    #     rate_dalk_carb = - dalk_carb_prop * alk_consumption
+    # end
 
     # CaCO3 minerals
     rate_pcalcite   = -Rdiss_calcite + Rprec_calcite
     rate_paragonite = -Rdiss_aragonite + Rprec_aragonite
 
     return (rate_dO2, rate_dtCO2, rate_dtNO3, rate_dtSO4, rate_dtPO4, rate_dtNH4,
-            rate_dtH2S, rate_dFeII, rate_dMnII, rate_dCH4, rate_dalk, rate_dCa,
+            rate_dtH2S, rate_dFeII, rate_dMnII, rate_dCH4, rate_dalk, rate_dalk_alloch, rate_dalk_aerob, rate_dalk_anaerob, rate_dalk_carb, rate_dCa,
             rate_pfoc, rate_psoc, rate_pFeOH3, rate_pMnO2, rate_pFeS, rate_pFeS2, rate_pFeOH3_PO4, rate_S0, rate_pcalcite, rate_paragonite,
-            Rdeg_dO2, Rdeg_dtNO3, Rdeg_dtSO4, Rdeg_pFeOH3, Rdeg_pMnO2, Rdeg_dCH4, Rdeg_total)
+            Rdeg_dO2, Rdeg_dtNO3, Rdeg_dtSO4, Rdeg_pFeOH3, Rdeg_pMnO2, Rdeg_dCH4, Rdeg_total, p2d, d2p)
 end
 
 "Rates of change of each component."
 function rates(
     dO2, dtNO3, pMnO2, pFeOH3, dtSO4, dtNH4, dtH2S, dFeII, dMnII, dCH4, dtPO4, pFeOH3_PO4, pFeS, pS0, pFeS2,
     pfoc_kfast, psoc_kslow, pcalcite, paragonite, dCa, dCO3, KCa, KAr,
-    phiS_phi_z, RC, RN, RP, T, calcite_diss_scheme, aragonite_diss_scheme, Q10_secondary, Tref
+    phiS_phi_z, RC, RN, RP, T, calcite_diss_scheme, aragonite_diss_scheme, calcite_prec_scheme, Q10_secondary, Tref,
+    dalk_alloch_prop, dalk_aerob_prop, dalk_anaerob_prop, dalk_carb_prop
 )
     (Rfast_dO2, Rslow_dO2, Rfast_dtNO3, Rslow_dtNO3,
      Rfast_pMnO2, Rslow_pMnO2, Rfast_pFeOH3, Rslow_pFeOH3,
@@ -545,7 +580,7 @@ function rates(
      R_dMnII, R_dFeII, R_dNH3, R_dH2S, R_dCH4_O2redox, R_dCH4_SO4redox, R_FEOH3_PO4_adsorp, R_Fe_MnO2_red, R_H2S_FeOOH_PO4_red, R_H2S_FeOOH_red, R_H2S_MnO2_red,
      R_FeS_H2S_Fe, R_FeS2_FeS_S0, R_FeS2_SO4_H2S_FeS, R_FeS_ox, R_FeS2_O2, R_S0_H20, R_MnO2a_MnO2b, R_FeOOHa_FeOOHb, Rdiss_calcite, Rdiss_aragonite, Rprec_calcite, Rprec_aragonite) =
         getreactions(dO2, dtNO3, pMnO2, pFeOH3, dtSO4, dtNH4, dtH2S, dFeII, dMnII, dCH4, dtPO4, pFeOH3_PO4, pFeS, pS0, pFeS2,
-                     pfoc_kfast, psoc_kslow, pcalcite, paragonite, dCa, dCO3, KCa, KAr, T, calcite_diss_scheme, aragonite_diss_scheme, Q10_secondary, Tref)
+                     pfoc_kfast, psoc_kslow, pcalcite, paragonite, dCa, dCO3, KCa, KAr, T, calcite_diss_scheme, aragonite_diss_scheme, calcite_prec_scheme, Q10_secondary, Tref)
 
     return reactions2rates(Rfast_dO2, Rslow_dO2, Rfast_dtNO3, Rslow_dtNO3,
                            Rfast_pMnO2, Rslow_pMnO2, Rfast_pFeOH3, Rslow_pFeOH3,
@@ -555,7 +590,7 @@ function rates(
                            R_Fe_MnO2_red, R_H2S_FeOOH_PO4_red, R_H2S_FeOOH_red, R_H2S_MnO2_red, R_FeS_H2S_Fe, 
                            R_FeS2_FeS_S0, R_FeS2_SO4_H2S_FeS, R_FeS_ox, R_FeS2_O2, R_S0_H20, R_MnO2a_MnO2b, R_FeOOHa_FeOOHb,
                            Rdiss_calcite, Rdiss_aragonite, Rprec_calcite, Rprec_aragonite,
-                           phiS_phi_z, RC, RN, RP)
+                           phiS_phi_z, RC, RN, RP, dalk_alloch_prop, dalk_aerob_prop, dalk_anaerob_prop, dalk_carb_prop)
 end
 
 end # module React
