@@ -2706,7 +2706,7 @@ d2p_mat = hcat([1.0 ./ model_params_list[i].phiS_phi for i in 1:trajectories]...
 
 matwrite(out_path, merge(
     Dict(
-        "t"               => sols[1].t,
+    "t"               => sols[1].t,
     "u"               => cat([cat(sols[i].u..., dims=3) for i in 1:trajectories]..., dims=4),
     "flux_t"          => flux_t,
     "OmegaCa"         => OmegaCa_arr,
