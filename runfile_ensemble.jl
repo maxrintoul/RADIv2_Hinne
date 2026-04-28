@@ -335,16 +335,238 @@ const DALK_EPS = 1e-18 # guard for tiny derivatives
     )
 end
 
+# Temperature dependent CO2-system constants on *kg* basis for Equilibrate.*
+
+@inline function temp_dep_chem_constants_kg(mp, T, S, P)
+
+    TempK = T + 273.15
+    RGasConstant = 83.1451
+    RT = RGasConstant * TempK  # ml bar-1 K-1 mol-1, DOEv2
+    logTempK = log(TempK)
+    sqrS = sqrt.(S)
+    IonS = @. 19.924*S / (1000 - 1.005*S) # This is from the DOE handbook, Chapter 5, p. 13/22, eq. 7.2.4:
+
+    ρ = mp.rho_sw
+
+
+    # TS - Morris, A. W., and Riley, J. P., Deep-Sea Research 13:699-705, 1966:
+    TS = (0.14 / 96.062) * S / 1.80655 # in mol/kg-SW
+
+    # TF - Riley, J. P., Deep-Sea Research 12:219-220, 1965
+    TF = (0.000067 / 18.998) * S / 1.80655 # in mol/kg-SW
+
+    # KF - Dickson, A. G. and Riley, J. P., Marine Chemistry 7:89-99, 1979:
+    lnKF = @. 1590.2/TempK - 12.641 + 1.525IonS^0.5
+    KF = @. exp(lnKF) *    # this is on the free pH scale in mol/kg-H2O
+    (1 - 0.001005*S) # convert to mol/kg-SW
+    # Free pH scale
+
+    # KSO4
+    lnKS = @. -4276.1/TempK + 141.328 - 23.093logTempK +
+      (-13856/TempK + 324.57 - 47.986logTempK)*sqrt(IonS) +
+      (35474/TempK - 771.54 + 114.723logTempK)*IonS +
+      (-2698/TempK)*sqrt(IonS)*IonS + (1776/TempK)*IonS^2
+	KS = @. exp(lnKS) *   # this is on the free pH scale in mol/kg-H2O
+        (1 - 0.001005 * S) # convert to mol/kg-SW
+
+    # Convert values to SWS pH scale and kg basis prior to pressure corrections
+    SWStoTOT_no_press  = @. (1 + TS/KS) / (1 + TS/KS + TF/KF)
+
+    # K1 - Hansson refit by Dickson and Millero, Deep-Sea Research, 34(10):1733-1743, 1987
+    pK1 = @. 3670.7/TempK - 62.008 + 9.7944logTempK -
+        0.0118*S + 0.000116*S^2
+    K1 = 10.0 .^ -pK1
+    # SWS pH scale
+
+    # K2 - Hansson refit by Dickson and Millero, Deep-Sea Research, 34(10):1733-1743, 1987
+    pK2 = @. 1394.7/TempK + 4.777 - 0.0184*S + 0.000118*S^2
+    K2 = 10.0 .^ -pK2
+    # SWS pH scale
+
+    # Kw - Millero, Geochemica et Cosmochemica Acta 59:661-677, 1995.
+    lnKW = @. 148.9802 - 13847.26/TempK - 23.6521*logTempK +
+        (-5.977 + 118.67/TempK + 1.0495*logTempK) *
+        sqrS - 0.01615*S
+    KW = exp.(lnKW)
+    # SWS pH scale
+
+    # KB - Dickson, A. G., Deep-Sea Research 37:755-766, 1990:
+    lnKBtop = @. -8966.9 - 2890.53sqrS - 77.942S +
+        1.728sqrS*S - 0.0996S^2
+    lnKB = @. lnKBtop/TempK + 148.0248 + 137.1942sqrS +
+        1.62142S + (-24.4344 - 25.085sqrS - 0.2474*
+        S) * logTempK + 0.053105sqrS*TempK
+    KB = @. exp(lnKB)/SWStoTOT_no_press
+    # SWS pH scale
+
+    # KF - Dickson, A. G. and Riley, J. P., Marine Chemistry 7:89-99, 1979:
+    lnKF = @. 1590.2/TempK - 12.641 + 1.525IonS^0.5
+    KF = @. exp(lnKF) *    # this is on the free pH scale in mol/kg-H2O
+    (1 - 0.001005*S) # convert to mol/kg-SW
+    # Free pH scale
+
+    # KP1 - Yao and Millero, Aquatic Geochemistry 1:53-88, 1995
+    lnKP1 = @. -4576.752/TempK + 115.54 - 18.453logTempK + (-106.736/TempK +
+        0.69171) * sqrS + (-0.65643/TempK - 0.01844) * S
+    KP1 = exp.(lnKP1)
+    # SWS pH scale
+
+    # KP2 - Yao and Millero, Aquatic Geochemistry 1:53-88, 1995
+    lnKP2 = @. -8814.715/TempK + 172.1033 - 27.927logTempK + (-160.34/TempK +
+        1.3566) * sqrS + (0.37335/TempK - 0.05778) * S
+    KP2 = exp.(lnKP2)
+    # SWS pH scale
+
+    # KP3 - Yao and Millero, Aquatic Geochemistry 1:53-88, 1995
+    lnKP3 = @. -3070.75/TempK - 18.126 + (17.27039/TempK + 2.81197) * sqrS +
+        (-44.99486/TempK - 0.09984) * S
+    KP3 = exp.(lnKP3)
+    # SWS pH scale
+
+    # KSi - Yao and Millero, Aquatic Geochemistry 1:53-88, 1995
+    lnKSi = @. -8904.2/TempK + 117.4 - 19.334logTempK + (-458.79/TempK +
+        3.5913) * sqrt(IonS) + (188.74/TempK - 1.5998) * IonS +
+        (-12.1652/TempK + 0.07871) * IonS^2
+    KSi = @. exp(lnKSi) * # this is on the SWS pH scale in mol/kg-H2O
+        (1 - 0.001005*S)    # convert to mol/kg-SW
+    # SWS pH scale
+
+    # KNH3 - Ammonia dissociation constant from Yao and Millero (1995)
+    PKNH4 = @. 9.244605-2729.33*(1/298.15 - 1/TempK) +
+          (0.04203362-11.24742/TempK)*S^0.25 + 
+          (-13.6416+1.176949*TempK^0.5 -
+          0.02860785*TempK+545.4834/TempK)*S^0.5+
+          (-0.1462507+0.0090226468*TempK^0.5-
+          0.0001471361*TempK+10.5425/TempK)*S^1.5+
+          (0.004669309-0.0001691742*TempK^0.5-
+          0.5677934/TempK)*S^2+
+          (-2.354039E-05+0.009698623/TempK)*S^2.5;
+    KNH4  = @. 10.0 ^ -PKNH4;                    # total scale, mol/kg-H2O
+    KNH4  = @. KNH4*(1-0.001005*S); # mol/kg-SW
+    KNH4  = KNH4 ./ SWStoTOT_no_press
+    # SWS pH scale
+
+    # KH2S - Millero et al. (1988)
+    KH2S = @. (exp(225.838-13275.3/TempK-34.6435*log(TempK) +
+              0.3449*S^0.5-0.0274*S)) / SWStoTOT_no_press
+    # SWS pH scale
+
+    # TB - Uppstrom, L., Deep-Sea Research 21:161-162, 1974:
+	TB = 0.0004157 * S / 35 # in mol/kg-SW
+    
+    ### Correct all constants for pressure effects
+
+    # KS - Millero, 1995
+    deltaV = @. -18.03 + 0.0466T + 0.000316T^2
+    Kappa = @. (-4.53 + 0.09T)/1000
+    lnKSfac = @. (-deltaV + 0.5Kappa*P)*P/RT
+
+    # K1 - Millero, 1995
+    deltaV  = @. -25.5 + 0.1271 * T
+    Kappa   = @. (-3.08 + 0.0877*T) / 1000
+    lnK1fac = @. (-deltaV + 0.5*Kappa*P)*P / RT
+
+    # K2 - Millero, 1995
+    deltaV  = @. -15.82 - 0.0219*T
+    Kappa   = @. (1.13 - 0.1475*T) / 1000  
+    lnK2fac = @. (-deltaV + 0.5Kappa*P)*P / RT
+
+    # KW - Millero 1983
+    deltaV  = @. -20.02 + 0.1119T - 0.001409T^2
+    Kappa   = @. (-5.13 + 0.0794T) / 1000 
+    lnKWfac = @. (-deltaV + 0.5Kappa*P)*P / RT
+
+    # KB - Millero, 1979
+    deltaV  = @. -29.48 + 0.1622T - 0.002608T^2
+    Kappa   = -2.84/1000
+    lnKBfac = @. (-deltaV + 0.5Kappa*P)*P / RT
+
+    # KF - Millero, 1995
+    deltaV = @. -9.78 - 0.009T - 0.000942T^2
+    Kappa = @. (-3.91 + 0.054T)/1000
+    lnKFfac = @. (-deltaV + 0.5Kappa*P)*P/RT
+
+    # KP1 - Millero, 1995
+    deltaV = @. -14.51 + 0.1211T - 0.000321T^2
+    Kappa  = @. (-2.67 + 0.0427T) / 1000
+    lnKP1fac = @. (-deltaV +  0.5Kappa*P) *P / RT
+
+    # KP2 - Millero, 1995
+    deltaV = @. -23.12 + 0.1758T - 0.002647T^2
+    Kappa  = @. (-5.15 + 0.09T) / 1000
+    lnKP2fac = @. (-deltaV +  0.5Kappa*P) *P / RT
+
+    # KP3 - Millero, 1995
+    deltaV = @. -26.57 + 0.202T - 0.003042T^2
+    Kappa  = @. (-4.08 + 0.0714T) / 1000
+    lnKP3fac = @. (-deltaV +  0.5Kappa*P) *P / RT
+
+    # KSi - Millero, 1995
+    deltaV = @. -29.48 + 0.1622T - 0.002608T^2
+    Kappa  = -2.84 / 1000
+    lnKSifac = @. (-deltaV +  0.5Kappa*P) *P / RT
+
+    # KNH3 - added by J. Sharp, unclear where from
+    deltaV = @. -26.43 + 0.0889.*T - 0.000905.*T^2;
+    Kappa  = @. (-5.03 + 0.0814.*T)./1000;
+    lnKNH4fac = @. (-deltaV + 0.5.*Kappa.*P).*P./RT;
+
+    # KH2S - added by J. Sharp, unclear where from
+    deltaV = @. -11.07 - 0.009.*T - 0.000942.*T^2;
+    Kappa  = @. (-2.89 + 0.054 .*T)./1000;
+    lnKH2Sfac = @. (-deltaV + 0.5.*Kappa.*P).*P./RT;
+
+    # CorrectKsForPressureHere:
+    K1fac  = exp.(lnK1fac);  K1  = K1 .*K1fac
+    K2fac  = exp.(lnK2fac);  K2  = K2 .*K2fac
+    KWfac  = exp.(lnKWfac);  KW  = KW .*KWfac
+    KBfac  = exp.(lnKBfac);  KB  = KB .*KBfac
+    KFfac  = exp.(lnKFfac);  KF  = KF .*KFfac
+    KSfac  = exp.(lnKSfac);  KS  = KS .*KSfac
+    KP1fac = exp.(lnKP1fac); KP1 = KP1.*KP1fac
+    KP2fac = exp.(lnKP2fac); KP2 = KP2.*KP2fac
+    KP3fac = exp.(lnKP3fac); KP3 = KP3.*KP3fac
+    KSifac = exp.(lnKSifac); KSi = KSi.*KSifac
+    KNH4fac = exp.(lnKNH4fac); KNH4 = KNH4.*KNH4fac; # added by J. Sharp
+    KH2Sfac = exp.(lnKH2Sfac); KH2S = KH2S.*KH2Sfac; # added by J. Sharp
+
+    # Convert back to total scale with corect pressure factors
+    SWStoTOT_correct_pressure = @. (1 + TS/KS) / (1 + TS/KS + TF/KF)
+    K1  = K1 .* SWStoTOT_correct_pressure
+    K2  = K2 .* SWStoTOT_correct_pressure
+    Kw  = KW .* SWStoTOT_correct_pressure
+    KB  = KB .* SWStoTOT_correct_pressure
+    KF  = KF .* SWStoTOT_correct_pressure
+    KS  = KS .* SWStoTOT_correct_pressure
+    KP1 = KP1 .* SWStoTOT_correct_pressure
+    KP2 = KP2 .* SWStoTOT_correct_pressure
+    KP3 = KP3 .* SWStoTOT_correct_pressure
+    KSi = KSi .* SWStoTOT_correct_pressure
+    KNH4 = KNH4 .* SWStoTOT_correct_pressure
+    KH2S = KH2S .* SWStoTOT_correct_pressure
+
+    return (
+        K1  = K1,   K2  = K2,   Kw  = Kw,
+        KB  = KB,   KF  = KF,   KSO4= KS,
+        KP1 = KP1,  KP2 = KP2,  KP3 = KP3,
+        KSi = KSi,  KNH3= KNH4, KH2S= KH2S,
+        TB  = TB,   TF  = TF,
+    )
+end
+
+
+
 # H_from_alk_m3: all inputs/outputs in mol/m^3; internally switches to kg for Equilibrate.*
 @inline function H_from_alk_m3(
     TA_m3::Float64, tCO2_m3::Float64, tNH4_m3::Float64, tPO4_m3::Float64,
-    tSO4_m3::Float64, tH2S_m3::Float64, mp;
+    tSO4_m3::Float64, tH2S_m3::Float64, mp, T_now::Float64;
     H0::Float64 = 1e-8 * mp.rho_sw,   # ~pH 8 guess on m^3 basis
     iters::Int = 1,                   # like your original: 1 (or 2) steps
     damp::Float64 = 1.0
 )::Float64
     ρ  = mp.rho_sw
-    cs = chem_constants_kg(mp)
+    # cs = chem_constants_kg(mp)
+    cs = temp_dep_chem_constants_kg(mp, T_now, S, P)
 
     # convert state/species to kg-basis for Equilibrate.*
     TA   = to_kg(TA_m3, ρ)
@@ -400,7 +622,7 @@ end
     H::Float64,
     dO2::Float64, dtCO2::Float64, dtNO3::Float64, dtSO4::Float64, dtPO4::Float64,
     dtNH4::Float64, dtH2S::Float64, dFeII::Float64, dMnII::Float64, dCH4::Float64,
-    dalk::Float64, dCa::Float64, pfoc::Float64, psoc::Float64, pFeOH3::Float64,
+    dalk::Float64, dalk_alloch::Float64, dalk_aerob::Float64, dalk_anaerob::Float64, dalk_carb::Float64, dCa::Float64, pfoc::Float64, psoc::Float64, pFeOH3::Float64,
     pMnO2::Float64, pcalcite::Float64, paragonite::Float64, pFeS::Float64, pFeS2::Float64,
     pS0::Float64, pFeOH3_PO4::Float64
 )::Nothing where {MP}
@@ -422,18 +644,33 @@ end
         denom::Float64 = K1*K2 + K1*H + H*H
         dCO3::Float64  = (dtCO2 * K1 * K2) / denom
 
+        # ---- Calculate proportions of dalk_alloch, dalk_aerob, dalk_anaerob, dalk_carb ----
+        dalk_comps_sum = dalk_alloch + dalk_aerob + dalk_anaerob + dalk_carb
+        dalk_alloch_prop::Float64 = dalk_alloch / dalk_comps_sum
+        dalk_aerob_prop::Float64 = dalk_aerob / dalk_comps_sum
+        dalk_anaerob_prop::Float64 = dalk_anaerob / dalk_comps_sum
+        dalk_carb_prop::Float64 = dalk_carb / dalk_comps_sum
+        dalk_comps_sum = dalk_alloch_prop + dalk_aerob_prop + dalk_anaerob_prop + dalk_carb_prop  # should be 1.0
+
+        if dalk_comps_sum != 1.0
+            dalk_alloch_prop = dalk_alloch_prop - (dalk_comps_sum - 1.0)
+        end
+
+        
+
         # ---- call your reaction kernel (must be scalar & type-stable) ----
         tup = React.rates(
             dO2, dtNO3, pMnO2, pFeOH3, dtSO4, dtNH4, dtH2S, dFeII, dMnII, dCH4, dtPO4, pFeOH3_PO4, pFeS, pS0, pFeS2,
             pfoc*kfast_k, psoc*kslow_k, pcalcite, paragonite, dCa,
-            dCO3, KCa, KAr, phiS_phi_k, RC, RN, RP, T, calcite_diss_scheme, aragonite_diss_scheme, Q10_secondary, Tref
+            dCO3, KCa, KAr, phiS_phi_k, RC, RN, RP, T, calcite_diss_scheme, aragonite_diss_scheme, calcite_precip_scheme, Q10_secondary, Tref,
+            dalk_alloch_prop, dalk_aerob_prop, dalk_anaerob_prop, dalk_carb_prop
         )  # should be NTuple{27,Float64}
 
         # destructure without allocations
         rate_dO2, rate_dtCO2, rate_dtNO3, rate_dtSO4, rate_dtPO4, rate_dtNH4, rate_dtH2S,
-        rate_dFeII, rate_dMnII, rate_dCH4, rate_dalk, rate_dCa, rate_pfoc, rate_psoc,
+        rate_dFeII, rate_dMnII, rate_dCH4, rate_dalk, rate_dalk_alloch, rate_dalk_aerob, rate_dalk_anaerob, rate_dalk_carb, rate_dCa, rate_pfoc, rate_psoc,
         rate_pFeOH3, rate_pMnO2, rate_pFeS, rate_pFeS2, rate_pFeOH3_PO4, rate_S0, rate_pcalcite, rate_paragonite,
-        Rdeg_dO2, Rdeg_dtNO3, Rdeg_dtSO4, Rdeg_pFeOH3, Rdeg_pMnO2, Rdeg_dCH4, Rdeg_total = tup
+        Rdeg_dO2, Rdeg_dtNO3, Rdeg_dtSO4, Rdeg_pFeOH3, Rdeg_pMnO2, Rdeg_dCH4, Rdeg_total, p2d, d2p = tup
 
         # write directly to r (no broadcasts)
         r[1]  = rate_dO2
@@ -447,17 +684,21 @@ end
         r[9]  = rate_dMnII
         r[10] = rate_dCH4
         r[11] = rate_dalk
-        r[12] = rate_dCa
-        r[13] = rate_pfoc
-        r[14] = rate_psoc
-        r[15] = rate_pFeOH3
-        r[16] = rate_pMnO2
-        r[17] = rate_pcalcite
-        r[18] = rate_paragonite
-        r[19] = rate_pFeS
-        r[20] = rate_pFeS2
-        r[21] = rate_S0
-        r[22] = rate_pFeOH3_PO4
+        r[12] = rate_dalk_alloch
+        r[13] = rate_dalk_aerob
+        r[14] = rate_dalk_anaerob
+        r[15] = rate_dalk_carb
+        r[16] = rate_dCa
+        r[17] = rate_pfoc
+        r[18] = rate_psoc
+        r[19] = rate_pFeOH3
+        r[20] = rate_pMnO2
+        r[21] = rate_pcalcite
+        r[22] = rate_paragonite
+        r[23] = rate_pFeS
+        r[24] = rate_pFeS2
+        r[25] = rate_S0
+        r[26] = rate_pFeOH3_PO4
         # r[19] presumably unused in your layout
         # r[23] = Rdeg_dO2
         # r[24] = Rdeg_dtNO3
@@ -484,6 +725,8 @@ end
 end
 
 @inline nz(x::T) where {T<:Real} = ifelse(x < zero(T), zero(T), x);
+
+@everywhere temp_forcing(t) = T_mean + T_amp * sin(2π * t - T_phase / T_period)
 
 # %% [markdown]
 #
@@ -737,8 +980,8 @@ end
             1e6dtPO4_i,
             1e6dtNH4_i,
             1e6dtH2S_i,
-            3,
-            10,
+            1,
+            4,
             1,)[1]
         K1 = co2s[1, 54][1] * rho_sw
         K2 = co2s[1, 55][1] * rho_sw
@@ -915,6 +1158,10 @@ dFeII = fill(dFeII_i*model_params.rho_sw, length(model_params.zc))
 dMnII = fill(dMnII_i*model_params.rho_sw, length(model_params.zc))
 dCH4 = fill(dCH4_i*model_params.rho_sw, length(model_params.zc))
 dalk = fill(dalk_i*model_params.rho_sw, length(model_params.zc))
+dalk_alloch = fill(dalk_alloch_i*model_params.rho_sw, length(model_params.zc))
+dalk_aerob = fill(dalk_aerob_i*model_params.rho_sw, length(model_params.zc))
+dalk_anaerob = fill(dalk_anaerob_i*model_params.rho_sw, length(model_params.zc))
+dalk_carb = fill(dalk_carb_i*model_params.rho_sw, length(model_params.zc))
 dCa_w = 0.02128 / 40.087 * S / 1.80655 #mol/kg
 dCa = fill(dCa_w*model_params.rho_sw, length(model_params.zc))
 pfoc = fill(pfoc_i, length(model_params.zc))
@@ -931,7 +1178,7 @@ pFeOH3_PO4 = fill(pFeOH3_PO4_i, length(model_params.zc))
 dH = fill(model_params.dH_i, length(model_params.zc))
 
 #create an input matrix for the solver
-u0 = zeros(22, length(model_params.zc))
+u0 = zeros(26, length(model_params.zc))
 u0[1, :] = dO2
 u0[2, :] = dtCO2
 u0[3, :] = dtNO3
@@ -943,17 +1190,21 @@ u0[8, :]= dFeII
 u0[9, :]= dMnII
 u0[10, :]= dCH4
 u0[11, :]=dalk
-u0[12, :]=dCa
-u0[13, :]=pfoc
-u0[14, :]=psoc 
-u0[15, :]=pFeOH3
-u0[16, :]=pMnO2
-u0[17, :]=pcalcite
-u0[18, :]=paragonite
-u0[19, :]=pFeS
-u0[20, :]=pFeS2
-u0[21, :]=pS0
-u0[22, :]=pFeOH3_PO4
+u0[12, :]=dalk_alloch
+u0[13, :]=dalk_aerob
+u0[14, :]=dalk_anaerob
+u0[15, :]=dalk_carb
+u0[16, :]=dCa
+u0[17, :]=pfoc
+u0[18, :]=psoc 
+u0[19, :]=pFeOH3
+u0[20, :]=pMnO2
+u0[21, :]=pcalcite
+u0[22, :]=paragonite
+u0[23, :]=pFeS
+u0[24, :]=pFeS2
+u0[25, :]=pS0
+u0[26, :]=pFeOH3_PO4
 
 # %%
 const RHS_CALLS = Threads.Atomic{Int}(0)
@@ -1047,6 +1298,10 @@ function physics_ensamble!(du, u , p ,t)
     MnIIw = (dMnII_w * rho_sw)::Float64
     CH4w  = (dCH4_w  * rho_sw)::Float64
     alkalw= (dalk_w  * rho_sw)::Float64
+    alk_allochw = (dalk_w * rho_sw)::Float64  # Same as open ocean alkalinity
+    alk_aerobw = 0.0::Float64     # Assume no alkalinity in the water column is from aerobic remineralisation within the sediments ie, products don't accumulate
+    alk_anaerobw = 0.0::Float64   # Assume no alkalinity in the water column is from anaerobic remineralisation within the sediments ie, products don't accumulate
+    alk_carbw = 0.0::Float64  # Assume no alkalinity in the water column is from carbonate dissolution within the sediments ie, products don't accumulate
     Caw   = (dCa_w   * rho_sw)::Float64
 
     # in-place reaction scratch (keep it concrete!)
@@ -1062,18 +1317,20 @@ function physics_ensamble!(du, u , p ,t)
                 dO2c   = nz(u[1,k]);  dtCO2c = nz(u[2,k]);  dtNO3c = nz(u[3,k])
                 dtSO4c = nz(u[4,k]);  dtPO4c = nz(u[5,k]);  dtNH4c = nz(u[6,k])
                 dtH2Sc = nz(u[7,k]);  dFeIIc = nz(u[8,k]);  dMnIIc = nz(u[9,k])
-                dCH4c  = nz(u[10,k]); dalkc  = nz(u[11,k]); dCac   = nz(u[12,k])
-                pfocc  = nz(u[13,k]); psocc  = nz(u[14,k]); pFeOH3c = nz(u[15,k])
-                pMnO2c = nz(u[16,k]); pcalcitec = nz(u[17,k]); paragonitec = nz(u[18,k])
-                pFeSc  = nz(u[19,k]); pFeS2c = nz(u[20,k]); pS0c   = nz(u[21,k])
-                pFeOH3_PO4c = nz(u[22,k]);
+                dCH4c  = nz(u[10,k]); dalkc  = nz(u[11,k]); dalk_allochc = nz(u[12,k]); 
+                dalk_aerobc = nz(u[13,k]); dalk_anaerobc = nz(u[14,k]); dalk_carbc = nz(u[15,k]);
+                dCac   = nz(u[16,k]); pfocc  = nz(u[17,k]); psocc  = nz(u[18,k]); pFeOH3c = nz(u[19,k])
+                pMnO2c = nz(u[20,k]); pcalcitec = nz(u[21,k]); paragonitec = nz(u[22,k])
+                pFeSc  = nz(u[23,k]); pFeS2c = nz(u[24,k]); pS0c   = nz(u[25,k])
+                pFeOH3_PO4c = nz(u[26,k]);
 
                 Hk = clamp(mp.H_cache[k], HMIN, HMAX)   # lagged H
 
                 # compute reaction rates using Hk (no H dynamics)
                 rates_wD!(r, mp, k, Hk,
                         dO2c, dtCO2c, dtNO3c, dtSO4c, dtPO4c, dtNH4c, dtH2Sc, dFeIIc, dMnIIc, dCH4c,
-                        dalkc, dCac, pfocc, psocc, pFeOH3c, pMnO2c, pcalcitec, paragonitec, pFeSc, pFeS2c, pS0c, pFeOH3_PO4c)
+                        dalkc, dalk_allochc, dalk_aerobc, dalk_anaerobc, dalk_carbc, dCac, pfocc, psocc, pFeOH3c, 
+                        pMnO2c, pcalcitec, paragonitec, pFeSc, pFeS2c, pS0c, pFeOH3_PO4c)
 
                 mp.H_diag[k] = Hk
 
@@ -1144,52 +1401,76 @@ function physics_ensamble!(du, u , p ,t)
                                                 D_dalk, D_dalk_tort2[1], DFF[k], φ0, mp.dbl_dalk, dz0) +
                         irrigate(u[11,k], alkalw, alpha[k]) + r[11]
 
-                du[12,k] = diffuse_SWI_2R(u[12,k+1], u[12,k], Caw,
+                du[12,k] = diffuse_SWI_2R(u[12,k+1], u[12,k], alk_allochw,
+                                        D_dalk_tort2[1],  D_dalk,  mp.dbl_dalk,  φ0, dz0, dz12) +
+                        advectsolute_SWI_2R(u_bur[k], u[12,k], alk_allochw,
+                                                D_dalk, D_dalk_tort2[1], DFF[k], φ0, mp.dbl_dalk, dz0) +
+                        irrigate(u[12,k], alk_allochw, alpha[k]) + r[12]
+
+                du[13,k] = diffuse_SWI_2R(u[13,k+1], u[13,k], alk_aerobw,
+                                        D_dalk_tort2[1],  D_dalk,  mp.dbl_dalk,  φ0, dz0, dz12) +
+                        advectsolute_SWI_2R(u_bur[k], u[13,k], alk_aerobw,
+                                                D_dalk, D_dalk_tort2[1], DFF[k], φ0, mp.dbl_dalk, dz0) +
+                        irrigate(u[13,k], alk_aerobw, alpha[k]) + r[13]
+
+                du[14,k] = diffuse_SWI_2R(u[14,k+1], u[14,k], alk_anaerobw,
+                                        D_dalk_tort2[1],  D_dalk,  mp.dbl_dalk,  φ0, dz0, dz12) +
+                        advectsolute_SWI_2R(u_bur[k], u[14,k], alk_anaerobw,
+                                                D_dalk, D_dalk_tort2[1], DFF[k], φ0, mp.dbl_dalk, dz0) +
+                        irrigate(u[14,k], alk_anaerobw, alpha[k]) + r[14]
+
+                du[15,k] = diffuse_SWI_2R(u[15,k+1], u[15,k], alk_carbw,
+                                        D_dalk_tort2[1],  D_dalk,  mp.dbl_dalk,  φ0, dz0, dz12) +
+                        advectsolute_SWI_2R(u_bur[k], u[15,k], alk_carbw,
+                                                D_dalk, D_dalk_tort2[1], DFF[k], φ0, mp.dbl_dalk, dz0) +
+                        irrigate(u[15,k], alk_carbw, alpha[k]) + r[15]
+
+                du[16,k] = diffuse_SWI_2R(u[16,k+1], u[16,k], Caw,
                                         D_dCa_tort2[1],   D_dCa,   mp.dbl_dCa,   φ0, dz0, dz12) +
-                        advectsolute_SWI_2R(u_bur[k], u[12,k], Caw,
+                        advectsolute_SWI_2R(u_bur[k], u[16,k], Caw,
                                                 D_dCa, D_dCa_tort2[1], DFF[k], φ0, mp.dbl_dCa, dz0) +
-                        irrigate(u[12,k], Caw, alpha[k]) + r[12]
+                        irrigate(u[16,k], Caw, alpha[k]) + r[16]
 
                 # Solids at the SWI
-                du[13,k] = diffuseSolid_SWI(u[13,k+1], u[13,k], Ffoc, D_bio[k], phiS[k], w[k], z_res[k]) +
-                        advectsolid_SWI(u[13,k], u[13,k+1], Ffoc, D_bio[k], APPW[k], sigma1m[k], sigma[k], sigma1p[k], phiS[k], w[k], z_res[k]) +
-                        r[13]
-
-                du[14,k] = diffuseSolid_SWI(u[14,k+1], u[14,k], Fsoc, D_bio[k], phiS[k], w[k], z_res[k]) +
-                        advectsolid_SWI(u[14,k], u[14,k+1], Fsoc, D_bio[k], APPW[k], sigma1m[k], sigma[k], sigma1p[k], phiS[k], w[k], z_res[k]) +
-                        r[14]
-
-                du[15,k] = diffuseSolid_SWI(u[15,k+1], u[15,k], FFeOH3, D_bio[k], phiS[k], w[k], z_res[k]) +
-                        advectsolid_SWI(u[15,k], u[15,k+1], FFeOH3, D_bio[k], APPW[k], sigma1m[k], sigma[k], sigma1p[k], phiS[k], w[k], z_res[k]) +
-                        r[15]
-
-                du[16,k] = diffuseSolid_SWI(u[16,k+1], u[16,k], FMnO2, D_bio[k], phiS[k], w[k], z_res[k]) +
-                        advectsolid_SWI(u[16,k], u[16,k+1], FMnO2, D_bio[k], APPW[k], sigma1m[k], sigma[k], sigma1p[k], phiS[k], w[k], z_res[k]) +
-                        r[16]
-
-                du[17,k] = diffuseSolid_SWI(u[17,k+1], u[17,k], Fcalcite, D_bio[k], phiS[k], w[k], z_res[k]) +
-                        advectsolid_SWI(u[17,k], u[17,k+1], Fcalcite, D_bio[k], APPW[k], sigma1m[k], sigma[k], sigma1p[k], phiS[k], w[k], z_res[k]) +
+                du[17,k] = diffuseSolid_SWI(u[17,k+1], u[17,k], Ffoc, D_bio[k], phiS[k], w[k], z_res[k]) +
+                        advectsolid_SWI(u[17,k], u[17,k+1], Ffoc, D_bio[k], APPW[k], sigma1m[k], sigma[k], sigma1p[k], phiS[k], w[k], z_res[k]) +
                         r[17]
 
-                du[18,k] = diffuseSolid_SWI(u[18,k+1], u[18,k], Faragonite, D_bio[k], phiS[k], w[k], z_res[k]) +
-                        advectsolid_SWI(u[18,k], u[18,k+1], Faragonite, D_bio[k], APPW[k], sigma1m[k], sigma[k], sigma1p[k], phiS[k], w[k], z_res[k]) +
+                du[18,k] = diffuseSolid_SWI(u[18,k+1], u[18,k], Fsoc, D_bio[k], phiS[k], w[k], z_res[k]) +
+                        advectsolid_SWI(u[18,k], u[18,k+1], Fsoc, D_bio[k], APPW[k], sigma1m[k], sigma[k], sigma1p[k], phiS[k], w[k], z_res[k]) +
                         r[18]
 
-                du[19,k] = diffuseSolid_SWI(u[19,k+1], u[19,k], FFeS, D_bio[k], phiS[k], w[k], z_res[k]) +
-                        advectsolid_SWI(u[19,k], u[19,k+1], FFeS, D_bio[k], APPW[k], sigma1m[k], sigma[k], sigma1p[k], phiS[k], w[k], z_res[k]) +
+                du[19,k] = diffuseSolid_SWI(u[19,k+1], u[19,k], FFeOH3, D_bio[k], phiS[k], w[k], z_res[k]) +
+                        advectsolid_SWI(u[19,k], u[19,k+1], FFeOH3, D_bio[k], APPW[k], sigma1m[k], sigma[k], sigma1p[k], phiS[k], w[k], z_res[k]) +
                         r[19]
 
-                du[20,k] = diffuseSolid_SWI(u[20,k+1], u[20,k], FFeS2, D_bio[k], phiS[k], w[k], z_res[k]) +
-                        advectsolid_SWI(u[20,k], u[20,k+1], FFeS2, D_bio[k], APPW[k], sigma1m[k], sigma[k], sigma1p[k], phiS[k], w[k], z_res[k]) +
+                du[20,k] = diffuseSolid_SWI(u[20,k+1], u[20,k], FMnO2, D_bio[k], phiS[k], w[k], z_res[k]) +
+                        advectsolid_SWI(u[20,k], u[20,k+1], FMnO2, D_bio[k], APPW[k], sigma1m[k], sigma[k], sigma1p[k], phiS[k], w[k], z_res[k]) +
                         r[20]
 
-                du[21,k] = diffuseSolid_SWI(u[21,k+1], u[21,k], FS0, D_bio[k], phiS[k], w[k], z_res[k]) +
-                        advectsolid_SWI(u[21,k], u[21,k+1], FS0, D_bio[k], APPW[k], sigma1m[k], sigma[k], sigma1p[k], phiS[k], w[k], z_res[k]) +
+                du[21,k] = diffuseSolid_SWI(u[21,k+1], u[21,k], Fcalcite, D_bio[k], phiS[k], w[k], z_res[k]) +
+                        advectsolid_SWI(u[21,k], u[21,k+1], Fcalcite, D_bio[k], APPW[k], sigma1m[k], sigma[k], sigma1p[k], phiS[k], w[k], z_res[k]) +
                         r[21]
 
-                du[22,k] = diffuseSolid_SWI(u[22,k+1], u[22,k], FFeOH3_PO4, D_bio[k], phiS[k], w[k], z_res[k]) +
-                        advectsolid_SWI(u[22,k], u[22,k+1], FFeOH3_PO4, D_bio[k], APPW[k], sigma1m[k], sigma[k], sigma1p[k], phiS[k], w[k], z_res[k]) +
+                du[22,k] = diffuseSolid_SWI(u[22,k+1], u[22,k], Faragonite, D_bio[k], phiS[k], w[k], z_res[k]) +
+                        advectsolid_SWI(u[22,k], u[22,k+1], Faragonite, D_bio[k], APPW[k], sigma1m[k], sigma[k], sigma1p[k], phiS[k], w[k], z_res[k]) +
                         r[22]
+
+                du[23,k] = diffuseSolid_SWI(u[23,k+1], u[23,k], FFeS, D_bio[k], phiS[k], w[k], z_res[k]) +
+                        advectsolid_SWI(u[23,k], u[23,k+1], FFeS, D_bio[k], APPW[k], sigma1m[k], sigma[k], sigma1p[k], phiS[k], w[k], z_res[k]) +
+                        r[23]
+
+                du[24,k] = diffuseSolid_SWI(u[24,k+1], u[24,k], FFeS2, D_bio[k], phiS[k], w[k], z_res[k]) +
+                        advectsolid_SWI(u[24,k], u[24,k+1], FFeS2, D_bio[k], APPW[k], sigma1m[k], sigma[k], sigma1p[k], phiS[k], w[k], z_res[k]) +
+                        r[24]
+
+                du[25,k] = diffuseSolid_SWI(u[25,k+1], u[25,k], FS0, D_bio[k], phiS[k], w[k], z_res[k]) +
+                        advectsolid_SWI(u[25,k], u[25,k+1], FS0, D_bio[k], APPW[k], sigma1m[k], sigma[k], sigma1p[k], phiS[k], w[k], z_res[k]) +
+                        r[25]
+
+                du[26,k] = diffuseSolid_SWI(u[26,k+1], u[26,k], FFeOH3_PO4, D_bio[k], phiS[k], w[k], z_res[k]) +
+                        advectsolid_SWI(u[26,k], u[26,k+1], FFeOH3_PO4, D_bio[k], APPW[k], sigma1m[k], sigma[k], sigma1p[k], phiS[k], w[k], z_res[k]) +
+                        r[26]
 
     end
 
@@ -1199,17 +1480,19 @@ function physics_ensamble!(du, u , p ,t)
                 dO2c   = nz(u[1,k]);  dtCO2c = nz(u[2,k]);  dtNO3c = nz(u[3,k])
                 dtSO4c = nz(u[4,k]);  dtPO4c = nz(u[5,k]);  dtNH4c = nz(u[6,k])
                 dtH2Sc = nz(u[7,k]);  dFeIIc = nz(u[8,k]);  dMnIIc = nz(u[9,k])
-                dCH4c  = nz(u[10,k]); dalkc  = nz(u[11,k]); dCac   = nz(u[12,k])
-                pfocc  = nz(u[13,k]); psocc  = nz(u[14,k]); pFeOH3c = nz(u[15,k])
-                pMnO2c = nz(u[16,k]); pcalcitec = nz(u[17,k]); paragonitec = nz(u[18,k]) 
-                pFeSc  = nz(u[19,k]); pFeS2c = nz(u[20,k]); pS0c   = nz(u[21,k]); pFeOH3_PO4c = nz(u[22,k]);
+                dCH4c  = nz(u[10,k]); dalkc  = nz(u[11,k]); dalk_allochc = nz(u[12,k]); 
+                dalk_aerobc = nz(u[13,k]); dalk_anaerobc = nz(u[14,k]); dalk_carbc = nz(u[15,k]);
+                dCac   = nz(u[16,k]); pfocc  = nz(u[17,k]); psocc  = nz(u[18,k]); pFeOH3c = nz(u[19,k])
+                pMnO2c = nz(u[20,k]); pcalcitec = nz(u[21,k]); paragonitec = nz(u[22,k]) 
+                pFeSc  = nz(u[23,k]); pFeS2c = nz(u[24,k]); pS0c   = nz(u[25,k]); pFeOH3_PO4c = nz(u[26,k]);
 
                 Hk = clamp(mp.H_cache[k], HMIN, HMAX)   # lagged H
 
                 # compute reaction rates using Hk (no H dynamics)
                 rates_wD!(r, mp, k, Hk,
                         dO2c, dtCO2c, dtNO3c, dtSO4c, dtPO4c, dtNH4c, dtH2Sc, dFeIIc, dMnIIc, dCH4c,
-                        dalkc, dCac, pfocc, psocc, pFeOH3c, pMnO2c, pcalcitec, paragonitec, pFeSc, pFeS2c, pS0c, pFeOH3_PO4c)
+                        dalkc, dalk_allochc, dalk_aerobc, dalk_anaerobc, dalk_carbc, dCac, pfocc, psocc, 
+                        pFeOH3c, pMnO2c, pcalcitec, paragonitec, pFeSc, pFeS2c, pS0c, pFeOH3_PO4c)
 
                 mp.H_diag[k] = Hk
 
@@ -1259,31 +1542,27 @@ function physics_ensamble!(du, u , p ,t)
                         advectsolute(u[11,k+1], u[11,k-1], u_bur[k], D_dalk, DFF[k], z_rescc[k]) +
                         irrigate(u[11,k], alkalw, alpha[k]) + r[11]
 
-                du[12, k] = diffuse(u[12,k-1], u[12,k], u[12,k+1], D_dCa_tort2[k], z_rescc[k]) +
-                        advectsolute(u[12,k+1], u[12,k-1], u_bur[k], D_dCa,  DFF[k], z_rescc[k]) +
-                        irrigate(u[12,k], Caw,    alpha[k]) + r[12]
+                du[12, k] = diffuse(u[12,k-1], u[12,k], u[12,k+1], D_dalk_tort2[k], z_rescc[k]) +
+                        advectsolute(u[12,k+1], u[12,k-1], u_bur[k], D_dalk, DFF[k], z_rescc[k]) +
+                        irrigate(u[12,k], alk_allochw, alpha[k]) + r[12]
+
+                du[13, k] = diffuse(u[13,k-1], u[13,k], u[13,k+1], D_dalk_tort2[k], z_rescc[k]) +
+                        advectsolute(u[13,k+1], u[13,k-1], u_bur[k], D_dalk, DFF[k], z_rescc[k]) +
+                        irrigate(u[13,k], alk_aerobw, alpha[k]) + r[13]
+
+                du[14, k] = diffuse(u[14,k-1], u[14,k], u[14,k+1], D_dalk_tort2[k], z_rescc[k]) +
+                        advectsolute(u[14,k+1], u[14,k-1], u_bur[k], D_dalk, DFF[k], z_rescc[k]) +
+                        irrigate(u[14,k], alk_anaerobw, alpha[k]) + r[14]
+
+                du[15, k] = diffuse(u[15,k-1], u[15,k], u[15,k+1], D_dalk_tort2[k], z_rescc[k]) +
+                        advectsolute(u[15,k+1], u[15,k-1], u_bur[k], D_dalk, DFF[k], z_rescc[k]) +
+                        irrigate(u[15,k], alk_carbw, alpha[k]) + r[15]
+
+                du[16, k] = diffuse(u[16,k-1], u[16,k], u[16,k+1], D_dCa_tort2[k], z_rescc[k]) +
+                        advectsolute(u[16,k+1], u[16,k-1], u_bur[k], D_dCa,  DFF[k], z_rescc[k]) +
+                        irrigate(u[16,k], Caw,    alpha[k]) + r[16]
 
                 # SOLIDS
-                du[13, k] = diffuse(u[13,k-1], u[13,k], u[13,k+1], D_bio[k], z_rescc[k]) +
-                        advectsolid(u[13,k], u[13,k+1], u[13,k-1],
-                                        APPW[k], sigma[k], sigma1p[k], sigma1m[k], z_rescc[k]) +
-                        r[13]
-
-                du[14, k] = diffuse(u[14,k-1], u[14,k], u[14,k+1], D_bio[k], z_rescc[k]) +
-                        advectsolid(u[14,k], u[14,k+1], u[14,k-1],
-                                        APPW[k], sigma[k], sigma1p[k], sigma1m[k], z_rescc[k]) +
-                        r[14]
-
-                du[15, k] = diffuse(u[15,k-1], u[15,k], u[15,k+1], D_bio[k], z_rescc[k]) +
-                        advectsolid(u[15,k], u[15,k+1], u[15,k-1],
-                                        APPW[k], sigma[k], sigma1p[k], sigma1m[k], z_rescc[k]) +
-                        r[15]
-
-                du[16, k] = diffuse(u[16,k-1], u[16,k], u[16,k+1], D_bio[k], z_rescc[k]) +
-                        advectsolid(u[16,k], u[16,k+1], u[16,k-1],
-                                        APPW[k], sigma[k], sigma1p[k], sigma1m[k], z_rescc[k]) +
-                        r[16]
-
                 du[17, k] = diffuse(u[17,k-1], u[17,k], u[17,k+1], D_bio[k], z_rescc[k]) +
                         advectsolid(u[17,k], u[17,k+1], u[17,k-1],
                                         APPW[k], sigma[k], sigma1p[k], sigma1m[k], z_rescc[k]) +
@@ -1314,6 +1593,26 @@ function physics_ensamble!(du, u , p ,t)
                                         APPW[k], sigma[k], sigma1p[k], sigma1m[k], z_rescc[k]) +
                         r[22]
 
+                du[23, k] = diffuse(u[23,k-1], u[23,k], u[23,k+1], D_bio[k], z_rescc[k]) +
+                        advectsolid(u[23,k], u[23,k+1], u[23,k-1],
+                                        APPW[k], sigma[k], sigma1p[k], sigma1m[k], z_rescc[k]) +
+                        r[23]
+
+                du[24, k] = diffuse(u[24,k-1], u[24,k], u[24,k+1], D_bio[k], z_rescc[k]) +
+                        advectsolid(u[24,k], u[24,k+1], u[24,k-1],
+                                        APPW[k], sigma[k], sigma1p[k], sigma1m[k], z_rescc[k]) +
+                        r[24]
+
+                du[25, k] = diffuse(u[25,k-1], u[25,k], u[25,k+1], D_bio[k], z_rescc[k]) +
+                        advectsolid(u[25,k], u[25,k+1], u[25,k-1],
+                                        APPW[k], sigma[k], sigma1p[k], sigma1m[k], z_rescc[k]) +
+                        r[25]
+
+                du[26, k] = diffuse(u[26,k-1], u[26,k], u[26,k+1], D_bio[k], z_rescc[k]) +
+                        advectsolid(u[26,k], u[26,k+1], u[26,k-1],
+                                        APPW[k], sigma[k], sigma1p[k], sigma1m[k], z_rescc[k]) +
+                        r[26]
+
                 # H (see earlier note re algebraic vs relaxation)
     end
 
@@ -1326,17 +1625,19 @@ function physics_ensamble!(du, u , p ,t)
                 dO2c   = nz(u[1,k]);  dtCO2c = nz(u[2,k]);  dtNO3c = nz(u[3,k])
                 dtSO4c = nz(u[4,k]);  dtPO4c = nz(u[5,k]);  dtNH4c = nz(u[6,k])
                 dtH2Sc = nz(u[7,k]);  dFeIIc = nz(u[8,k]);  dMnIIc = nz(u[9,k])
-                dCH4c  = nz(u[10,k]); dalkc  = nz(u[11,k]); dCac   = nz(u[12,k])
-                pfocc  = nz(u[13,k]); psocc  = nz(u[14,k]); pFeOH3c = nz(u[15,k])
-                pMnO2c = nz(u[16,k]); pcalcitec = nz(u[17,k]); paragonitec = nz(u[18,k])
-                pFeSc  = nz(u[19,k]); pFeS2c = nz(u[20,k]); pS0c   = nz(u[21,k]); pFeOH3_PO4c = nz(u[22,k])
+                dCH4c  = nz(u[10,k]); dalkc  = nz(u[11,k]); dalk_allochc = nz(u[12,k]);
+                dalk_aerobc = nz(u[13,k]); dalk_anaerobc = nz(u[14,k]); dalk_carbc = nz(u[15,k]);
+                dCac   = nz(u[16,k]); pfocc  = nz(u[17,k]); psocc  = nz(u[18,k]); pFeOH3c = nz(u[19,k])
+                pMnO2c = nz(u[20,k]); pcalcitec = nz(u[21,k]); paragonitec = nz(u[22,k])
+                pFeSc  = nz(u[23,k]); pFeS2c = nz(u[24,k]); pS0c   = nz(u[25,k]); pFeOH3_PO4c = nz(u[26,k])
 
                 Hk = clamp(mp.H_cache[k], HMIN, HMAX)   # lagged H
 
                 # compute reaction rates using Hk (no H dynamics)
                 rates_wD!(r, mp, k, Hk,
                         dO2c, dtCO2c, dtNO3c, dtSO4c, dtPO4c, dtNH4c, dtH2Sc, dFeIIc, dMnIIc, dCH4c,
-                        dalkc, dCac, pfocc, psocc, pFeOH3c, pMnO2c, pcalcitec, paragonitec, pFeSc, pFeS2c, pS0c, pFeOH3_PO4c)
+                        dalkc, dalk_allochc, dalk_aerobc, dalk_anaerobc, dalk_carbc, dCac, pfocc, psocc, 
+                        pFeOH3c, pMnO2c, pcalcitec, paragonitec, pFeSc, pFeS2c, pS0c, pFeOH3_PO4c)
 
                 mp.H_diag[k] = Hk
 
@@ -1353,17 +1654,13 @@ function physics_ensamble!(du, u , p ,t)
                 du[9, k]  = diffuse_BBC(u[9,k],  u[9,k-1],  D_dMnII_tort2[k], z_res[k]) + irrigate(u[9,k],  MnIIw, alpha[k]) + r[9]
                 du[10,k]  = diffuse_BBC(u[10,k], u[10,k-1], D_dCH4_tort2[k], z_res[k]) + irrigate(u[10,k], CH4w,  alpha[k]) + r[10]
                 du[11,k]  = diffuse_BBC(u[11,k], u[11,k-1], D_dalk_tort2[k], z_res[k]) + irrigate(u[11,k], alkalw, alpha[k]) + r[11]
-                du[12,k]  = diffuse_BBC(u[12,k], u[12,k-1], D_dCa_tort2[k], z_res[k]) + irrigate(u[12,k], Caw,    alpha[k]) + r[12]
+                du[12,k]  = diffuse_BBC(u[12,k], u[12,k-1], D_dalk_tort2[k], z_res[k]) + irrigate(u[12,k], alk_allochw, alpha[k]) + r[12]
+                du[13,k]  = diffuse_BBC(u[13,k], u[13,k-1], D_dalk_tort2[k], z_res[k]) + irrigate(u[13,k], alk_aerobw, alpha[k]) + r[13]
+                du[14,k]  = diffuse_BBC(u[14,k], u[14,k-1], D_dalk_tort2[k], z_res[k]) + irrigate(u[14,k], alk_anaerobw, alpha[k]) + r[14]
+                du[15,k]  = diffuse_BBC(u[15,k], u[15,k-1], D_dalk_tort2[k], z_res[k]) + irrigate(u[15,k], alk_carbw, alpha[k]) + r[15]
+                du[16,k]  = diffuse_BBC(u[16,k], u[16,k-1], D_dCa_tort2[k], z_res[k]) + irrigate(u[16,k], Caw,    alpha[k]) + r[16]
 
                 # ---- SOLIDS (Neumann diffusion + throughflow advection + reactions) ----
-                du[13,k]  = diffuse_BBC(u[13,k], u[13,k-1], D_bio[k], z_res[k]) +
-                                advectsolid_BBC(u[13,k], u[13,k-1], APPW[k], sigma[k], z_res[k]) + r[13]
-                du[14,k]  = diffuse_BBC(u[14,k], u[14,k-1], D_bio[k], z_res[k]) +
-                                advectsolid_BBC(u[14,k], u[14,k-1], APPW[k], sigma[k], z_res[k]) + r[14]
-                du[15,k]  = diffuse_BBC(u[15,k], u[15,k-1], D_bio[k], z_res[k]) +
-                                advectsolid_BBC(u[15,k], u[15,k-1], APPW[k], sigma[k], z_res[k]) + r[15]
-                du[16,k]  = diffuse_BBC(u[16,k], u[16,k-1], D_bio[k], z_res[k]) +
-                                advectsolid_BBC(u[16,k], u[16,k-1], APPW[k], sigma[k], z_res[k]) + r[16]
                 du[17,k]  = diffuse_BBC(u[17,k], u[17,k-1], D_bio[k], z_res[k]) +
                                 advectsolid_BBC(u[17,k], u[17,k-1], APPW[k], sigma[k], z_res[k]) + r[17]
                 du[18,k]  = diffuse_BBC(u[18,k], u[18,k-1], D_bio[k], z_res[k]) +
@@ -1376,6 +1673,14 @@ function physics_ensamble!(du, u , p ,t)
                                 advectsolid_BBC(u[21,k], u[21,k-1], APPW[k], sigma[k], z_res[k]) + r[21]
                 du[22,k]  = diffuse_BBC(u[22,k], u[22,k-1], D_bio[k], z_res[k]) +
                                 advectsolid_BBC(u[22,k], u[22,k-1], APPW[k], sigma[k], z_res[k]) + r[22]
+                du[23,k]  = diffuse_BBC(u[23,k], u[23,k-1], D_bio[k], z_res[k]) +
+                                advectsolid_BBC(u[23,k], u[23,k-1], APPW[k], sigma[k], z_res[k]) + r[23]
+                du[24,k]  = diffuse_BBC(u[24,k], u[24,k-1], D_bio[k], z_res[k]) +
+                                advectsolid_BBC(u[24,k], u[24,k-1], APPW[k], sigma[k], z_res[k]) + r[24]
+                du[25,k]  = diffuse_BBC(u[25,k], u[25,k-1], D_bio[k], z_res[k]) +
+                                advectsolid_BBC(u[25,k], u[25,k-1], APPW[k], sigma[k], z_res[k]) + r[25]
+                du[26,k]  = diffuse_BBC(u[26,k], u[26,k-1], D_bio[k], z_res[k]) +
+                                advectsolid_BBC(u[26,k], u[26,k-1], APPW[k], sigma[k], z_res[k]) + r[26]
 
 
         end
@@ -1397,7 +1702,7 @@ prob = ODEProblem(physics_ensamble!, u0, tspan, (
 using SparseArrays, LinearSolve, OrdinaryDiffEq
 
 # Block-tridiagonal sparsity pattern (nvar per layer, Nz layers)
-function jac_prototype(mp; nvar=22)
+function jac_prototype(mp; nvar=26)
     Nz = length(mp.zc)
     N  = nvar*Nz
     rows = Int[]; cols = Int[]
@@ -1495,6 +1800,10 @@ function compute_swi_fluxes(u, mp, dO2_w_local)
     MnIIw = Main.dMnII_w * ρ
     CH4w  = Main.dCH4_w  * ρ
     ALKw  = Main.dalk_w  * ρ
+    ALK_allochw = Main.dalk_w * ρ
+    ALK_aerobw = 0.0 * ρ
+    ALK_anaerobw = 0.0 * ρ
+    ALK_carbw = 0.0 * ρ
     Caw   = Main.dCa_w   * ρ
 
     # top-cell values
@@ -1509,7 +1818,11 @@ function compute_swi_fluxes(u, mp, dO2_w_local)
     MnII_1 = u[9,1]
     CH4_1  = u[10,1]
     ALK_1  = u[11,1]
-    Ca_1   = u[12,1]
+    ALK_alloch_1 = u[12,1]
+    ALK_aerob_1 = u[13,1]
+    ALK_anaerob_1 = u[14,1]
+    ALK_carb_1 = u[15,1]
+    Ca_1   = u[16,1]
 
     # SWI diffusive exchange (positive upward / out of sediment)
     Jdiff = (
@@ -1524,6 +1837,10 @@ function compute_swi_fluxes(u, mp, dO2_w_local)
         MnII = J_swi_diff(MnII_1, MnIIw, mp.D_dMnII, mp.D_dMnII_tort2[1], phi0, mp.dbl_dMnII, dz0),
         CH4  = J_swi_diff(CH4_1,  CH4w,  mp.D_dCH4,  mp.D_dCH4_tort2[1],  phi0, mp.dbl_dCH4,  dz0),
         Alk  = J_swi_diff(ALK_1,  ALKw,  mp.D_dalk,  mp.D_dalk_tort2[1],  phi0, mp.dbl_dalk,  dz0),
+        Alk_alloch = J_swi_diff(ALK_alloch_1, ALK_allochw, mp.D_dalk, mp.D_dalk_tort2[1], phi0, mp.dbl_dalk, dz0),
+        Alk_aerob = J_swi_diff(ALK_aerob_1, ALK_aerobw, mp.D_dalk, mp.D_dalk_tort2[1], phi0, mp.dbl_dalk, dz0),
+        Alk_anaerob = J_swi_diff(ALK_anaerob_1, ALK_anaerobw, mp.D_dalk, mp.D_dalk_tort2[1], phi0, mp.dbl_dalk, dz0),
+        Alk_carb = J_swi_diff(ALK_carb_1, ALK_carbw, mp.D_dalk, mp.D_dalk_tort2[1], phi0, mp.dbl_dalk, dz0),
         Ca   = J_swi_diff(Ca_1,   Caw,   mp.D_dCa,   mp.D_dCa_tort2[1],   phi0, mp.dbl_dCa,   dz0),
     )
 
@@ -1544,7 +1861,11 @@ function compute_swi_fluxes(u, mp, dO2_w_local)
         MnII = J_irr_net(view(u,9,:),   MnIIw, ϕ, α, dz),
         CH4  = J_irr_net(view(u,10,:),  CH4w,  ϕ, α, dz),
         Alk  = J_irr_net(view(u,11,:),  ALKw,  ϕ, α, dz),
-        Ca   = J_irr_net(view(u,12,:),  Caw,   ϕ, α, dz),
+        Alk_alloch = J_irr_net(view(u,12,:), ALK_allochw, ϕ, α, dz),
+        Alk_aerob = J_irr_net(view(u,13,:), ALK_aerobw, ϕ, α, dz),
+        Alk_anaerob = J_irr_net(view(u,14,:), ALK_anaerobw, ϕ, α, dz),
+        Alk_carb = J_irr_net(view(u,15,:), ALK_carbw, ϕ, α, dz),
+        Ca   = J_irr_net(view(u,16,:),  Caw,   ϕ, α, dz),
     )
 
     # total net fluxes as local scalars first
@@ -1559,6 +1880,10 @@ function compute_swi_fluxes(u, mp, dO2_w_local)
     J_MnII = Jdiff.MnII + Jirr.MnII
     J_CH4  = Jdiff.CH4  + Jirr.CH4
     J_Alk  = Jdiff.Alk  + Jirr.Alk
+    J_Alk_alloch  = Jdiff.Alk_alloch  + Jirr.Alk_alloch
+    J_Alk_aerob  = Jdiff.Alk_aerob  + Jirr.Alk_aerob
+    J_Alk_anaerob  = Jdiff.Alk_anaerob  + Jirr.Alk_anaerob
+    J_Alk_carb  = Jdiff.Alk_carb  + Jirr.Alk_carb
     J_Ca   = Jdiff.Ca   + Jirr.Ca
 
     Jnet = (
@@ -1573,6 +1898,10 @@ function compute_swi_fluxes(u, mp, dO2_w_local)
         MnII = J_MnII,
         CH4  = J_CH4,
         Alk  = J_Alk,
+        Alk_alloch  = J_Alk_alloch,
+        Alk_aerob  = J_Alk_aerob,
+        Alk_anaerob  = J_Alk_anaerob,
+        Alk_carb  = J_Alk_carb,
         Ca   = J_Ca,
         Alk_eff_H2Scorr   = J_Alk - 2.0*J_tH2S,
         Alk_eff_totalcorr = J_Alk - 2.0*J_tH2S - 2.0*J_FeII - 2.0*J_MnII
@@ -1583,7 +1912,7 @@ function compute_swi_fluxes(u, mp, dO2_w_local)
 
     OmegaCa_profile = Vector{Float64}(undef, Nz_)
     @inbounds for k in 1:Nz_
-        dCa_k   = max(u[12, k], 0.0)
+        dCa_k   = max(u[16, k], 0.0)
         dtCO2_k = max(u[2,  k], 0.0)
         Hk      = clamp(mp.H_cache[k], HMIN, HMAX)
         denom_k = mp.K1*mp.K2 + mp.K1*Hk + Hk*Hk
@@ -1623,7 +1952,7 @@ function compute_reaction_rate_snapshot(u, mp)
 
     rate_names = (
         :dO2, :dtCO2, :dtNO3, :dtSO4, :dtPO4, :dtNH4, :dtH2S,
-        :dFeII, :dMnII, :dCH4, :dalk, :dCa,
+        :dFeII, :dMnII, :dCH4, :dalk, :dalk_alloch, :dalk_aerob, :dalk_anaerob, :dalk_carb, :dCa,
         :pfoc, :psoc, :pFeOH3, :pMnO2, :pFeS, :pFeS2,
         :pFeOH3_PO4, :pS0, :pcalcite, :paragonite,
     )
@@ -1652,17 +1981,17 @@ function compute_reaction_rate_snapshot(u, mp)
         dFeII = nz(u[8,  k])
         dMnII = nz(u[9,  k])
         dCH4  = nz(u[10, k])
-        dCa   = nz(u[12, k])
-        pfoc  = nz(u[13, k])
-        psoc  = nz(u[14, k])
-        pFeOH3 = nz(u[15, k])
-        pMnO2  = nz(u[16, k])
-        pcalcite = nz(u[17, k])
-        paragonite = nz(u[18, k])
-        pFeS = nz(u[19, k])
-        pFeS2 = nz(u[20, k])
-        pS0 = nz(u[21, k])
-        pFeOH3_PO4 = nz(u[22, k])
+        dCa   = nz(u[16, k])
+        pfoc  = nz(u[17, k])
+        psoc  = nz(u[18, k])
+        pFeOH3 = nz(u[19, k])
+        pMnO2  = nz(u[20, k])
+        pcalcite = nz(u[21, k])
+        paragonite = nz(u[22, k])
+        pFeS = nz(u[23, k])
+        pFeS2 = nz(u[24, k])
+        pS0 = nz(u[25, k])
+        pFeOH3_PO4 = nz(u[26, k])
 
         Hk = clamp(H_profile[k], HMIN, HMAX)
         denom_k = mp.K1 * mp.K2 + mp.K1 * Hk + Hk * Hk
@@ -1679,14 +2008,14 @@ function compute_reaction_rate_snapshot(u, mp)
             dtPO4, pFeOH3_PO4, pFeS, pS0, pFeS2,
             pfoc * kfast_k, psoc * kslow_k,
             pcalcite, paragonite, dCa, dCO3_k, mp.KCa, mp.KAr,
-            T, calcite_diss_scheme, aragonite_diss_scheme, Q10_secondary, Tref,
+            T, calcite_diss_scheme, aragonite_diss_scheme, calcite_precip_scheme, Q10_secondary, Tref,
         )
 
         for (name, val) in zip(reaction_names, rxn_vals)
             getproperty(reaction_profiles, name)[k] = val
         end
 
-        net_vals = React.reactions2rates(rxn_vals..., phiS_phi_k, mp.RC, mp.RN, mp.RP)
+        net_vals = React.reactions2rates(rxn_vals..., phiS_phi_k, mp.RC, mp.RN, mp.RP, 0.0, 0.0, 0.0, 0.0)
         for (name, val) in zip(rate_names, net_vals[1:length(rate_names)])
             getproperty(rate_profiles, name)[k] = val
         end
@@ -1752,6 +2081,7 @@ end
 function refresh_H_cache_each_step!(u, t, integrator)
     mp = integrator.p.model_params
     Nz = size(u, 2)
+    T_now = temp_forcing(t)
 
     @inbounds for k in 1:Nz
         dtCO2c = nz(u[2,k])
@@ -1764,7 +2094,7 @@ function refresh_H_cache_each_step!(u, t, integrator)
         H0k = clamp(mp.H_cache[k], HMIN, HMAX)
 
         Hk = H_from_alk_m3(
-            dalkc, dtCO2c, dtNH4c, dtPO4c, dtSO4c, dtH2Sc, mp;
+            dalkc, dtCO2c, dtNH4c, dtPO4c, dtSO4c, dtH2Sc, mp, T_now;
             H0 = H0k, iters = 1, damp = 0.4
         )
 
@@ -1800,7 +2130,7 @@ BLAS.set_num_threads(1)  # avoid over-subscription with EnsembleThreads()
 # -----------------------------
 # 1) Jacobian sparsity helper
 # -----------------------------
-function jac_prototype(mp; nvar::Int=22)
+function jac_prototype(mp; nvar::Int=26)
     Nz = length(mp.zc)
     N = nvar * Nz
     rows = Int[]
@@ -1831,7 +2161,7 @@ else
 end
 
 
-function cached_jac(mp; nvar::Int=22)
+function cached_jac(mp; nvar::Int=26)
     key = (nvar, length(mp.zc))
     get!(J_CACHE, key) do
         Jp = jac_prototype(mp; nvar=nvar)
@@ -1846,7 +2176,7 @@ end
 function make_u0_from_IC(mp, dO2_w_local)
     Nz = length(mp.zc)
     ρ = mp.rho_sw
-    u0 = zeros(22, Nz)
+    u0 = zeros(26, Nz)
     u0[1, :] .= dO2_w_local * ρ
     u0[2, :] .= dtCO2_w * ρ
     u0[3, :] .= dtNO3_w * ρ
@@ -1858,18 +2188,22 @@ function make_u0_from_IC(mp, dO2_w_local)
     u0[9, :] .= dMnII_w * ρ
     u0[10, :] .= dCH4_w * ρ
     u0[11, :] .= dalk_w * ρ
+    u0[12, :] .= dalk_w * ρ
+    u0[13, :] .= 0.0 * ρ
+    u0[14, :] .= 0.0 * ρ
+    u0[15, :] .= 0.0 * ρ
     dCa_w = 0.02128 / 40.087 * S / 1.80655
-    u0[12, :] .= dCa_w * ρ
-    u0[13, :] .= pfoc_i
-    u0[14, :] .= psoc_i
-    u0[15, :] .= pFeOH3_i
-    u0[16, :] .= pMnO2_i
-    u0[17, :] .= pcalcite_i
-    u0[18, :] .= paragonite_i
-    u0[19, :] .= pFeS_i
-    u0[20, :] .= pFeS2_i
-    u0[21, :] .= pS0_i
-    u0[22, :] .= pFeOH3_PO4_i
+    u0[16, :] .= dCa_w * ρ
+    u0[17, :] .= pfoc_i
+    u0[18, :] .= psoc_i
+    u0[19, :] .= pFeOH3_i
+    u0[20, :] .= pMnO2_i
+    u0[21, :] .= pcalcite_i
+    u0[22, :] .= paragonite_i
+    u0[23, :] .= pFeS_i
+    u0[24, :] .= pFeS2_i
+    u0[25, :] .= pS0_i
+    u0[26, :] .= pFeOH3_PO4_i
     return u0
 end
 
@@ -2202,13 +2536,13 @@ size(sols[1].u[1])
 
 # Variable names in the same order used when populating u0[1:22, :].
 var_names = [
-    "dO2", "dtCO2", "dtNO3", "dtSO4", "dtPO4", "dtNH4", "dtH2S", "dFeII", "dMnII", "dCH4", "dalk", "dCa",
-    "pfoc", "psoc", "pFeOH3", "pMnO2", "pcalcite", "paragonite", "pFeS", "pFeS2", "pS0", "pFeOH3_PO4"
+    "dO2", "dtCO2", "dtNO3", "dtSO4", "dtPO4", "dtNH4", "dtH2S", "dFeII", "dMnII", "dCH4", "dalk", "dalk_alloch","dalk_aerob",
+    "dalk_anaerob","dalk_carb","dCa","pfoc", "psoc", "pFeOH3", "pMnO2", "pcalcite", "paragonite", "pFeS", "pFeS2", "pS0", "pFeOH3_PO4"
  ]
 
-# Build one heatmap per variable index x = 1:22.
-heatmaps = Vector{Any}(undef, 22)
-for x in 1:22
+# Build one heatmap per variable index x = 1:26.
+heatmaps = Vector{Any}(undef, 26)
+for x in 1:26
     hmap_data = [u[x, :] for u in sols[1].u]
     hmap_matrix = vcat([d' for d in hmap_data]...)  # rows = time, columns = depth
 
@@ -2244,9 +2578,10 @@ jnet_species  = keys(flux_saved[1].saveval[1].Jnet)
 jdiff_species = keys(flux_saved[1].saveval[1].Jdiff)
 jirr_species  = keys(flux_saved[1].saveval[1].Jirr)
 
-Jnet_mat  = Dict("Jnet_$(String(sp))"  => _pack_scalar(:Jnet,  sp) for sp in jnet_species)
-Jdiff_mat = Dict("Jdiff_$(String(sp))" => _pack_scalar(:Jdiff, sp) for sp in jdiff_species)
-Jirr_mat  = Dict("Jirr_$(String(sp))"  => _pack_scalar(:Jirr,  sp) for sp in jirr_species)
+# Pack as nested Dicts -> saved as MATLAB structs
+Jnet_mat  = Dict(String(sp) => _pack_scalar(:Jnet,  sp) for sp in jnet_species)
+Jdiff_mat = Dict(String(sp) => _pack_scalar(:Jdiff, sp) for sp in jdiff_species)
+Jirr_mat  = Dict(String(sp) => _pack_scalar(:Jirr,  sp) for sp in jirr_species)
 
 # --- OmegaCa:  (Nz x ntimes_flux x ntrajectories) ---
 OmegaCa_arr = cat([
@@ -2277,40 +2612,44 @@ if save_reaction_rates && reaction_saved !== nothing && !isempty(reaction_saved[
     rate_names = keys(reaction_saved[1].saveval[1].rates)
     aggregate_names = keys(reaction_saved[1].saveval[1].aggregates)
 
-    reaction_export = merge(
-        Dict(
-            "reaction_t" => reaction_t,
-            "reaction_H" => _pack_carbonate(:H),
-            "reaction_dCO3" => _pack_carbonate(:dCO3),
-            "reaction_OmegaCa" => _pack_carbonate(:OmegaCa),
-        ),
-        Dict("rxn_$(String(name))" => _pack_reaction(:reactions, name) for name in reaction_names),
-        Dict("rate_$(String(name))" => _pack_reaction(:rates, name) for name in rate_names),
-        Dict("aggregate_$(String(name))" => _pack_reaction(:aggregates, name) for name in aggregate_names),
+    # Pack as nested Dicts -> saved as MATLAB struct fields
+    reaction_export = Dict{String,Any}(
+        "t"       => reaction_t,
+        "H"       => _pack_carbonate(:H),
+        "dCO3"    => _pack_carbonate(:dCO3),
+        "OmegaCa" => _pack_carbonate(:OmegaCa),
+        "reactions"  => Dict(String(name) => _pack_reaction(:reactions,  name) for name in reaction_names),
+        "rates"      => Dict(String(name) => _pack_reaction(:rates,      name) for name in rate_names),
+        "aggregates" => Dict(String(name) => _pack_reaction(:aggregates, name) for name in aggregate_names),
     )
 end
 
-matwrite(fname, merge(
-    Dict(
-        "t"             => sols[1].t,
-        "u"             => cat([cat(sols[i].u..., dims=3) for i in 1:trajectories]..., dims=4),
-        "flux_t"        => flux_t,
-        "OmegaCa"       => OmegaCa_arr,
-        "H"             => H_arr,
-        "T_vals"        => new_T,
-        "U_vals"        => new_U,
-        "Fpom_vals"     => new_Fpom,
-        "Fcalcite_vals" => new_Fcalcite,
-        "P_vals"        => new_P,
-        "O_vals"        => new_O,
-        "zc"            => model_params_list[1].zc,
-        "S"             => S
-    ),
-    Jnet_mat,
-    Jdiff_mat,
-    Jirr_mat,
-    reaction_export,
+# p2d and d2p: (Nz x ntrajectories)
+p2d_mat = hcat([model_params_list[i].phiS_phi for i in 1:trajectories]...)
+d2p_mat = hcat([1.0 ./ model_params_list[i].phiS_phi for i in 1:trajectories]...)
+
+matwrite(fname, Dict{String,Any}(
+    "t"               => sols[1].t,
+    "u"               => cat([cat(sols[i].u..., dims=3) for i in 1:trajectories]..., dims=4),
+    "flux_t"          => flux_t,
+    "OmegaCa"         => OmegaCa_arr,
+    "H"               => H_arr,
+    "T_vals"          => new_T,
+    "U_vals"          => new_U,
+    "Fpom_vals"       => new_Fpom,
+    "Fcalcite_vals"   => new_Fcalcite,
+    "P_vals"          => new_P,
+    "O_vals"          => new_O,
+    "zc"              => model_params_list[1].zc,
+    "S"               => S,
+    "p2d"             => p2d_mat,
+    "d2p"             => d2p_mat,
+    "Jnet"            => Jnet_mat,
+    "Jdiff"           => Jdiff_mat,
+    "Jirr"            => Jirr_mat,
+    "reaction_export" => reaction_export,
 ))
+
 
 
 # %%
@@ -2344,8 +2683,8 @@ co2s_final = CO2System.CO2SYS(
     1e6dtPO4_i,
     1e6dtNH4_i,
     1e6dtH2S_i,
-    3,
-    10,
+    1,
+    4,
     1,)[1]
 # K1 = co2s[1, 54][1] * rho_sw
 # K2 = co2s[1, 55][1] * rho_sw

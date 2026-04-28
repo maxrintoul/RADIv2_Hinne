@@ -35,7 +35,11 @@ lambda_b = 0.08  # /m  # no corresponding value found in read_data_set_max.ipynb
 lambda_i = 0.05  # /m  # no corresponding value found in read_data_set_max.ipynb
 
 # Define overlying water column properties
-T = 8.16577142857143
+T_mean = 8.16577142857143 # °C
+T_amp = 2.0 # °C
+T_period = 1.0 # years
+T_phase = 0.0 # years
+T = T_mean # °C, initial temperature for chemistry calculations
 S = 34.4551
 P = 25.0  # dbar/depth from CTD bottom-most value
 rho_sw = gsw_rho(S, T, P) # seawater density / kg/m^3
@@ -46,7 +50,10 @@ dtCO2_w = 0.0021287334340083655
 dtNO3_w = 8.01039955872e-7
 dtSO4_w = (29264.2e-6 * S / 35)  # estimated from salinity
 dtNH4_w = 4.157194260107362e-6
-dalk_w = 0.002325656666666667
+dalk_alloch_w = copy(dalk_w)  # Tracer for allochthonous alkalinity input, e.g. from overlying water column. Assume all initial alk is allochthonous for simplicity.
+dalk_aerob_w = 0.0            # Tracer for alkalinity produced from aerobic respiration
+dalk_anaerob_w = 0.0          # Tracer for alkalinity produced from anaerobic respiration
+dalk_carb_w = 0.0             # Tracer for alkalinity produced from carbonate dissolution
 
 dtPO4_w = 2.2165396e-6  # no corresponding value found in read_data_set_max.ipynb
 dtH2S_w = 0.0           # no corresponding value found in read_data_set_max.ipynb
@@ -79,6 +86,11 @@ dtSO4_i = copy(dtSO4_w)
 dtNH4_i = copy(dtNH4_w)
 dalk_i = copy(dalk_w)
 
+dalk_alloch_i = copy(dalk_i)    # Tracer for allochthonous alkalinity input, e.g. from overlying water column. Assume all initial alk is allochthonous for simplicity.
+dalk_aerob_i = 0.0              # Tracer for alkalinity produced from aerobic respiration
+dalk_anaerob_i = 0.0            # Tracer for alkalinity produced from anaerobic respiration
+dalk_carb_i = 0.0               # Tracer for alkalinity produced from carbonate dissolution
+
 dtPO4_i = copy(dtPO4_w)   # no corresponding value found in read_data_set_max.ipynb
 dtH2S_i = copy(dtH2S_w)   # no corresponding value found in read_data_set_max.ipynb
 dFeII_i = copy(dFeII_w)   # no corresponding value found in read_data_set_max.ipynb
@@ -101,6 +113,9 @@ pFeOH3_PO4_i = 0.0        # no corresponding value found in read_data_set_max.ip
 # Define dissolution scheme for CaCO3 (1 = base RADI, 2 = temp dependent dissolution)
 calcite_diss_scheme = 2   # no corresponding value found in read_data_set_max.ipynb
 aragonite_diss_scheme = 2 # no corresponding value found in read_data_set_max.ipynb
+
+# Define precipitation scheme for calcite (1 = base RADI, 2 = temp dependent precipitation)
+calcite_precip_scheme = 2 # no corresponding value found in read_data_set_max.ip
 
 # Define Q10 for secondary reactions
 Q10_primary = 2.0   # no corresponding value found in read_data_set_max.ipynb
