@@ -50,6 +50,7 @@ dtCO2_w = 0.0021287334340083655
 dtNO3_w = 8.01039955872e-7
 dtSO4_w = (29264.2e-6 * S / 35)  # estimated from salinity
 dtNH4_w = 4.157194260107362e-6
+dalk_w = 0.002325656666666667
 dalk_alloch_w = copy(dalk_w)  # Tracer for allochthonous alkalinity input, e.g. from overlying water column. Assume all initial alk is allochthonous for simplicity.
 dalk_aerob_w = 0.0            # Tracer for alkalinity produced from aerobic respiration
 dalk_anaerob_w = 0.0          # Tracer for alkalinity produced from anaerobic respiration

@@ -39,6 +39,7 @@ T_mean = 8.16577142857143 # °C
 T_amp = 0.0 # °C
 T_period = 1.0 # years
 T_phase = 0.0 # years
+T = T_mean # °C, initial temperature for chemistry calculations
 S = 34.4551
 P = 25.0  # dbar/depth from CTD bottom-most value
 rho_sw = gsw_rho(S, T, P) # seawater density / kg/m^3
