@@ -36,7 +36,7 @@ lambda_i = 0.05  # /m  # no corresponding value found in read_data_set_max.ipynb
 
 # Define overlying water column properties
 T_mean = 8.16577142857143 # °C
-T_amp = 2.0 # °C
+T_amp = 0.0 # °C
 T_period = 1.0 # years
 T_phase = 0.0 # years
 T = T_mean # °C, initial temperature for chemistry calculations
@@ -124,8 +124,8 @@ Tref = 9.0          # no corresponding value found in read_data_set_max.ipynb
 
 # Optional factorial controls
 factorial_T_levels        = [10.0]
-factorial_Fpom_levels     = [33.52618867924528*0.1, 33.52618867924528]
+factorial_Fpom_levels     = [33.52618867924528*0.1, 33.52618867924528*0.5, 33.52618867924528]
 factorial_U_levels        = [U]
 factorial_P_levels        = [P]
 factorial_Fcalcite_levels = [0.01, 0.1, 1.0]
-factorial_O_levels        = [10, 20, 40, 80] * 1e-6
+factorial_O_levels        = [20, 100, 200, 400] * 1e-6

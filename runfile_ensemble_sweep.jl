@@ -2037,7 +2037,7 @@ end
 
 # Choose when to save diagnostics (in model time units; your notebook uses years)
 # Example: save every 0.1 yr. Adjust as needed.
-flux_saveat = 0.0:0.001:(Main.tspan[2])
+flux_saveat = 0.0:1:(Main.tspan[2])
 
 # Optional detailed reaction-rate saving.
 # Set `save_reaction_rates = true` to store a full depth profile of all reactions.
@@ -2069,8 +2069,8 @@ reaction_cb = if save_reaction_rates
             (u, t, integrator) -> compute_reaction_rate_snapshot(u, integrator.p.model_params),
             reaction_saved_single;
             saveat = reaction_rate_saveat,
-            save_start = true,
-            save_end = true,
+            save_start = false,
+            save_end = false,
         )
     end
 else
@@ -2253,9 +2253,11 @@ new_O = [g[6] for g in grid]
 # new_Fcalcite = 0.2 
 
 # Fix a concrete params type
-proto = calculate_constants(new_T[1], new_U[1], new_P[1], new_Fpom[1], 
-    new_Fcalcite[1], Fpom_s, Fpom_f, kfast, kslow, dO2_w
+proto = calculate_constants(new_T[1], new_U[1], new_P[1], 
+    new_Fpom[1], new_Fcalcite[1], 
+    Fpom_s, Fpom_f, kfast, kslow, new_O[1]
 )
+
 const ParamsT = typeof(proto)
 
 # --- keep simple per-trajectory metadata (like before) ---
@@ -2303,7 +2305,7 @@ prob_base = ODEProblem(f0, u0_list[1], tspan, p_list[1])
 # 5) prob_func
 # -----------------------------
 # Save times (choose what you want; years in your setup)
-flux_saveat = 0.0:0.001:tspan[2]
+flux_saveat = 0.0:1:tspan[2]
 # flux_saveat = vcat(
 #     0.0:0.01:1.0, 
 #     1.1:0.1:8.0, 
@@ -2434,9 +2436,18 @@ end
 
 alg = FBDF(autodiff=false, linsolve=linsolve_alg)
 
-_ = solve(remake(prob_base); alg,
-    abstol=abstol_v, reltol=reltol_v,
-    save_everystep=false, saveat=flux_saveat, save_on=false, dense=false)
+# _ = solve(remake(prob_base); alg,
+#     abstol=1e-7/5, reltol=1e-4/5,
+#     save_everystep=false, saveat=flux_saveat, save_on=false, dense=false)
+
+warm_prob = prob_func(prob_base, 1, 1)
+t0 = first(warm_prob.tspan)
+dt_warm = min(1e-6, 1e-3 * (last(warm_prob.tspan) - t0))
+warm_prob = remake(warm_prob; tspan=(t0, t0 + dt_warm))
+
+_ = solve(warm_prob; alg,
+    adaptive=false, dt=dt_warm,
+    save_on=false, dense=false, maxiters=10)
 
 
 # -----------------------------
@@ -2704,10 +2715,18 @@ end
 p2d_mat = hcat([model_params_list[i].phiS_phi for i in 1:trajectories]...)
 d2p_mat = hcat([1.0 ./ model_params_list[i].phiS_phi for i in 1:trajectories]...)
 
+
+function pad_u(sol, expected_nt, Nvar, Nz)
+    arr = isempty(sol.u) ? fill(NaN, Nvar, Nz, 0) : cat(sol.u..., dims=3)
+    nt = size(arr, 3)
+    nt < expected_nt && (arr = cat(arr, fill(NaN, Nvar, Nz, expected_nt - nt), dims=3))
+    return arr
+end
+
 matwrite(out_path, merge(
     Dict(
-    "t"               => sols[1].t,
-    "u"               => cat([cat(sols[i].u..., dims=3) for i in 1:trajectories]..., dims=4),
+    "t"               => collect(flux_saveat),
+    "u"               => cat([pad_u(sols[i], expected_nt, Nvar, Nz) for i in 1:trajectories]..., dims=4),
     "flux_t"          => flux_t,
     "OmegaCa"         => OmegaCa_arr,
     "H"               => H_arr,

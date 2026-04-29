@@ -2038,7 +2038,7 @@ end
 
 # Choose when to save diagnostics (in model time units; your notebook uses years)
 # Example: save every 0.1 yr. Adjust as needed.
-flux_saveat = 0.0:0.001:(Main.tspan[2])
+flux_saveat = 0.0:1:(Main.tspan[2])
 
 # Optional detailed reaction-rate saving.
 # Set `save_reaction_rates = true` to store a full depth profile of all reactions.
@@ -2070,8 +2070,8 @@ reaction_cb = if save_reaction_rates
             (u, t, integrator) -> compute_reaction_rate_snapshot(u, integrator.p.model_params),
             reaction_saved_single;
             saveat = reaction_rate_saveat,
-            save_start = true,
-            save_end = true,
+            save_start = false,
+            save_end = false,
         )
     end
 else
@@ -2256,9 +2256,10 @@ new_O = [g[6] for g in grid]
 # Fix a concrete params type
 proto = calculate_constants(
     new_T[1], new_U[1], new_P[1],
-    new_Fpom[1], new_Fcalcite[1],
-    0.3, 0.7, 30.0, 0.05, new_O[1]
+    new_Fpom[1], new_Fcalcite[1],    
+    Fpom_s, Fpom_f, kfast, kslow, new_O[1]
 )
+
 const ParamsT = typeof(proto)
 
 # --- keep simple per-trajectory metadata (like before) ---
@@ -2306,7 +2307,7 @@ prob_base = ODEProblem(f0, u0_list[1], tspan, p_list[1])
 # 5) prob_func
 # -----------------------------
 # Save times (choose what you want; years in your setup)
-flux_saveat = 0.0:0.001:tspan[2]
+flux_saveat = 0.0:1:tspan[2]
 # flux_saveat = vcat(
 #     0.0:0.01:1.0, 
 #     1.1:0.1:8.0, 
@@ -2438,9 +2439,18 @@ end
 
 alg = FBDF(autodiff=false, linsolve=linsolve_alg)
 
-_ = solve(remake(prob_base); alg,
-    abstol=1e-7, reltol=1e-5,
-    save_everystep=false, saveat=flux_saveat, save_on=false, dense=false)
+# _ = solve(remake(prob_base); alg,
+#     abstol=1e-7/5, reltol=1e-4/5,
+#     save_everystep=false, saveat=flux_saveat, save_on=false, dense=false)
+
+warm_prob = prob_func(prob_base, 1, 1)
+t0 = first(warm_prob.tspan)
+dt_warm = min(1e-6, 1e-3 * (last(warm_prob.tspan) - t0))
+warm_prob = remake(warm_prob; tspan=(t0, t0 + dt_warm))
+
+_ = solve(warm_prob; alg,
+    adaptive=false, dt=dt_warm,
+    save_on=false, dense=false, maxiters=10)
 
 
 # -----------------------------
@@ -2568,31 +2578,51 @@ fname = "sols_all_$(stamp).mat"
 
 # -- pack fluxes: each species -> (ntimes_flux x ntrajectories) matrix ---
 flux_t = flux_saved[1].t   # same time grid for all trajectories
+expected_nf = length(flux_t)    # expected number of flux save points
+
+expected_nt = length(collect(flux_saveat))
+Nvar, Nz    = size(sols[1].u[1])   # assumes at least 1 saved step in trajectory 1
+
+# Reference Nz from a complete trajectory (or any trajectory)
+_ref_i = findfirst(i -> length(flux_saved[i].saveval) == expected_nf, 1:trajectories)
+_ref_i = isnothing(_ref_i) ? 1 : _ref_i
+Nz_flux = length(flux_saved[_ref_i].saveval[1].OmegaCa)
+
+# Pad scalar flux to expected length (returns Vector{Float64} length expected_nf)
+function pad_flux_scalar(i, field, subfield)
+    vals = [getproperty(v[field], subfield) for v in flux_saved[i].saveval]
+    n = length(vals)
+    n < expected_nf && append!(vals, fill(NaN, expected_nf - n))
+    return vals
+end
+
+# Pad vector flux to (Nz, expected_nf)
+function pad_flux_vector(i, accessor)
+    cols = [accessor(v) for v in flux_saved[i].saveval]
+    n = length(cols)
+    if n < expected_nf
+        nan_col = fill(NaN, Nz_flux)
+        append!(cols, [nan_col for _ in 1:(expected_nf - n)])
+    end
+    return hcat(cols...)  # (Nz, expected_nf)
+end
 
 _pack_scalar(field, subfield) = hcat([
-    [getproperty(v[field], subfield) for v in flux_saved[i].saveval]
+    pad_flux_scalar(i, field, subfield)
     for i in 1:trajectories
-]...)   # -> (ntimes_flux, ntrajectories)
+]...)   # -> (expected_nf, trajectories)
 
-jnet_species  = keys(flux_saved[1].saveval[1].Jnet)
-jdiff_species = keys(flux_saved[1].saveval[1].Jdiff)
-jirr_species  = keys(flux_saved[1].saveval[1].Jirr)
+jnet_species  = keys(flux_saved[_ref_i].saveval[1].Jnet)
+jdiff_species = keys(flux_saved[_ref_i].saveval[1].Jdiff)
+jirr_species  = keys(flux_saved[_ref_i].saveval[1].Jirr)
 
 # Pack as nested Dicts -> saved as MATLAB structs
 Jnet_mat  = Dict(String(sp) => _pack_scalar(:Jnet,  sp) for sp in jnet_species)
 Jdiff_mat = Dict(String(sp) => _pack_scalar(:Jdiff, sp) for sp in jdiff_species)
 Jirr_mat  = Dict(String(sp) => _pack_scalar(:Jirr,  sp) for sp in jirr_species)
 
-# --- OmegaCa:  (Nz x ntimes_flux x ntrajectories) ---
-OmegaCa_arr = cat([
-    hcat([v.OmegaCa for v in flux_saved[i].saveval]...)  # (Nz, ntimes_flux)
-    for i in 1:trajectories
-]..., dims=3)
-
-H_arr = cat([
-    hcat([v.H for v in flux_saved[i].saveval]...)
-    for i in 1:trajectories
-]..., dims=3)
+OmegaCa_arr = cat([pad_flux_vector(i, v -> v.OmegaCa) for i in 1:trajectories]..., dims=3)
+H_arr       = cat([pad_flux_vector(i, v -> v.H)       for i in 1:trajectories]..., dims=3)
 
 reaction_export = Dict{String,Any}()
 if save_reaction_rates && reaction_saved !== nothing && !isempty(reaction_saved[1].saveval)
@@ -2628,9 +2658,16 @@ end
 p2d_mat = hcat([model_params_list[i].phiS_phi for i in 1:trajectories]...)
 d2p_mat = hcat([1.0 ./ model_params_list[i].phiS_phi for i in 1:trajectories]...)
 
+function pad_u(sol, expected_nt, Nvar, Nz)
+    arr = isempty(sol.u) ? fill(NaN, Nvar, Nz, 0) : cat(sol.u..., dims=3)
+    nt = size(arr, 3)
+    nt < expected_nt && (arr = cat(arr, fill(NaN, Nvar, Nz, expected_nt - nt), dims=3))
+    return arr
+end
+
 matwrite(fname, Dict{String,Any}(
-    "t"               => sols[1].t,
-    "u"               => cat([cat(sols[i].u..., dims=3) for i in 1:trajectories]..., dims=4),
+    "t"               => collect(flux_saveat),
+    "u"               => cat([pad_u(sols[i], expected_nt, Nvar, Nz) for i in 1:trajectories]..., dims=4),
     "flux_t"          => flux_t,
     "OmegaCa"         => OmegaCa_arr,
     "H"               => H_arr,
@@ -2663,7 +2700,7 @@ alk = [1000.0 * u[11,1] for u in sols[1].u]
 dic = [1000.0 * u[2,1] for u in sols[1].u]  # convert from mol/m^3 to mmol/m^3
 pl = plot(sols[1].t, alk, label="dalk (k=1)",
           xlabel="Time (y)", ylabel="Concentration (mol/m^3)",
-          title="Alkalinity Time Series")
+          title="Alkalinity/DIC Time Series")
           plot!(sols[1].t, dic, label="dtCO2 (k=1)")
 display(pl)
 
