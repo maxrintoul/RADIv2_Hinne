@@ -2611,6 +2611,10 @@ out_path = make_unique_output_path(out_dir)
 # Trajectories that hit dtmin abort early and produce fewer saved values.
 flux_lens = [length(flux_saved[i].t) for i in 1:trajectories]
 flux_nmax = maximum(flux_lens)
+
+expected_nt = length(collect(flux_saveat))
+Nvar, Nz    = size(sols[1].u[1])
+
 for i in 1:trajectories
     if flux_lens[i] < flux_nmax
         @warn "Trajectory $i saved only $(flux_lens[i])/$flux_nmax flux time points (aborted early?)"
