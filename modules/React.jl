@@ -255,7 +255,7 @@ function redox(
     R_H2S_MnO2_red = kH2S_MnO2_red * max(dtH2S, 0.0) * max(pMnO2, 0.0) * Q10_secondary^((T - Tref)/10)
     R_FeS_H2S_Fe = kpFeS_H2S_Fe * max(dtH2S, 0.0) * max(dFeII, 0.0) * Q10_secondary^((T - Tref)/10)
     R_FeS2_FeS_S0 = kpFeS2_FeS_S0 * max(pFeS, 0.0) * max(pS0, 0.0) * Q10_secondary^((T - Tref)/10)
-    R_FeS2_SO4_H2S_FeS = kpFeS2_SO4_H2S_FeS * max(pFeS, 0.0) * Q10_secondary^((T - Tref)/10)
+    R_FeS2_SO4_H2S_FeS = kpFeS2_SO4_H2S_FeS * max(pFeS, 0.0) * monod(max(dtH2S, 0.0), CREF_H2S) * Q10_secondary^((T - Tref)/10)
     R_FeS_ox = kFeS_ox * max(pFeS, 0.0) * max(dO2, 0.0) * Q10_secondary^((T - Tref)/10)
     R_FeS2_O2 = kFeS2_O2 * max(pFeS2, 0.0) * max(dO2, 0.0) * Q10_secondary^((T - Tref)/10)
     R_S0_H20 = kS0_H2O_ox * max(pS0, 0.0) * Q10_secondary^((T - Tref)/10)

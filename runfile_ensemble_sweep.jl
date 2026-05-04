@@ -2440,15 +2440,20 @@ alg = FBDF(autodiff=false, linsolve=linsolve_alg)
 #     abstol=1e-7/5, reltol=1e-4/5,
 #     save_everystep=false, saveat=flux_saveat, save_on=false, dense=false)
 
+using SciMLBase
+
 warm_prob = prob_func(prob_base, 1, 1)
 t0 = first(warm_prob.tspan)
 dt_warm = min(1e-6, 1e-3 * (last(warm_prob.tspan) - t0))
 warm_prob = remake(warm_prob; tspan=(t0, t0 + dt_warm))
 
-_ = solve(warm_prob; alg,
+warm_sol = solve(warm_prob; alg,
     adaptive=false, dt=dt_warm,
     save_on=false, dense=false, maxiters=10)
 
+@show warm_sol.retcode
+@show SciMLBase.successful_retcode(warm_sol)
+@show warm_sol.t[end], warm_prob.tspan[end]
 
 # -----------------------------
 # 7) Run ensemble (progress prints here)
@@ -2460,6 +2465,14 @@ sols = solve(
     abstol=abstol_v / 5, reltol=reltol_v / 5,
     save_on=true, save_everystep=false, saveat=flux_saveat, save_start=true, save_end=true, dense=false, maxiters=5_000_000, dtmin=1e-12
 )
+
+for i in eachindex(sols)
+    ok = SciMLBase.successful_retcode(sols[i])
+    reached_end = sols[i].t[end] >= tspan[2] - 1e-12
+    if !(ok && reached_end)
+        @warn "trajectory failed or ended early" i retcode=sols[i].retcode tend=sols[i].t[end] tstop=tspan[2]
+    end
+end
 
 # %%
 size(sols[1])

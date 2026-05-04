@@ -125,8 +125,8 @@ Tref = 9.0          # no corresponding value found in read_data_set_max.ipynb
 
 # Optional factorial controls
 factorial_T_levels        = [10.0]
-factorial_Fpom_levels     = [33.52618867924528*0.1, 33.52618867924528*0.5, 33.52618867924528]
+factorial_Fpom_levels     = [33.52618867924528*1.25, 33.52618867924528*5.0, 33.52618867924528*10.0]
 factorial_U_levels        = [U]
 factorial_P_levels        = [P]
 factorial_Fcalcite_levels = [0.01, 0.1, 1.0]
-factorial_O_levels        = [20, 100, 200, 400] * 1e-6
+factorial_O_levels        = [20.0, 100, 200, 400] * 1e-6
