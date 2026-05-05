@@ -48,6 +48,7 @@ include("modules/Params.jl");
 # @everywhere include("setup/IC_CS2_2_shallow.jl");
 
 @everywhere include("setup/IC_HF2_shallow_fact.jl");
+@everywhere using .HF2_shallow_fact_params
 
 
 # %% [markdown]
@@ -2062,8 +2063,8 @@ reaction_cb = if save_reaction_rates
             (u, t, integrator) -> compute_reaction_rate_snapshot(u, integrator.p.model_params),
             reaction_saved_single;
             save_everystep = true,
-            save_start = true,
-            save_end = true,
+            save_start = false,
+            save_end = false,
         )
     else
         SavingCallback(
@@ -2328,8 +2329,8 @@ prob_func = function (prob, i, repeat)
         flux_saved[i];
         save_everystep = false,
         saveat = flux_saveat,
-        save_start = true,
-        save_end = true,
+        save_start = false,
+        save_end = false,
         # saveat = flux_saveat
     )
 
@@ -2342,16 +2343,16 @@ prob_func = function (prob, i, repeat)
                 (u, t, integrator) -> compute_reaction_rate_snapshot(u, integrator.p.model_params),
                 reaction_saved[i];
                 save_everystep = true,
-                save_start = true,
-                save_end = true,
+                save_start = false,
+                save_end = false,
             )
         else
             SavingCallback(
                 (u, t, integrator) -> compute_reaction_rate_snapshot(u, integrator.p.model_params),
                 reaction_saved[i];
                 saveat = reaction_rate_saveat,
-                save_start = true,
-                save_end = true,
+                save_start = false,
+                save_end = false,
             )
         end
         push!(callbacks, rcb)
@@ -2461,7 +2462,7 @@ sols = solve(
     ens, alg, EnsembleThreads();
     trajectories=trajectories,
     abstol=1e-7/5, reltol=1e-4/5,
-    save_on=true, save_everystep=false, saveat=flux_saveat, save_start=true, save_end=true, dense=false,maxiters = 5_000_000, dtmin = 1e-12
+    save_on=true, save_everystep=false, saveat=flux_saveat, save_start=false, save_end=false, dense=false,maxiters = 5_000_000, dtmin = 1e-12
 )
 
 # %%
@@ -2581,7 +2582,7 @@ flux_t = flux_saved[1].t   # same time grid for all trajectories
 expected_nf = length(flux_t)    # expected number of flux save points
 
 expected_nt = length(collect(flux_saveat))
-Nvar, Nz    = size(sols[1].u[1])   # assumes at least 1 saved step in trajectory 1
+# Nvar, Nz    = size(sols[1].u[1])   # assumes at least 1 saved step in trajectory 1
 
 # Reference Nz from a complete trajectory (or any trajectory)
 _ref_i = findfirst(i -> length(flux_saved[i].saveval) == expected_nf, 1:trajectories)
