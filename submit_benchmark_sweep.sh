@@ -39,7 +39,7 @@ CORE_CONFIGS=(
 # Format: "abstol reltol"  label
 TOL_CONFIGS=(
     # "1e-6 1e-4 loose"
-    "2e-8 2e-6 medium"
+    "1e-7 1e-4 medium"
     # "1e-8 1e-6 tight"
 )
 
