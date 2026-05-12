@@ -26,10 +26,19 @@ Threads.nthreads()
 # %%
 using Distributed
 @everywhere using MAT
-@everywhere using DifferentialEquations, ProgressLogging
+@everywhere using DifferentialEquations, BenchmarkTools, ProgressLogging
 @everywhere using Plots; gr()
-@everywhere using JLD2
+@everywhere using JLD2  
 using StaticArrays
+using Dates
+using SparseArrays, LinearSolve, OrdinaryDiffEq
+using DiffEqCallbacks
+using LinearAlgebra, SparseDiffTools
+using OrdinaryDiffEq, SciMLBase
+using DataFrames
+using UUIDs
+
+
 
 # %% [markdown]
 # ### RADI modules
@@ -48,6 +57,7 @@ include("modules/Params.jl");
 # @everywhere include("setup/IC_IberianMargin_shallow.jl");
 # @everywhere include("setup/IC_HF2_shallow.jl");
 @everywhere include(_ic_file);
+@everywhere using .HF2_shallow_fact_params
 
 # %% [markdown]
 # ### Functions running inside the ODE Solver
@@ -725,8 +735,6 @@ end
 
 @everywhere temp_forcing(t) = T_mean + T_amp * sin(2π * t - T_phase / T_period)
 
-# %% [markdown]
-#
 
 # %% [markdown]
 # ### Parameters needed to run the model
@@ -852,7 +860,7 @@ end
 
 # %%
 @everywhere begin   
-    function calculate_constants(T, U, P, Fpom, Fcalcite, Fpom_s, Fpom_f, kfast, kslow, dO2_w_local)
+    function calculate_constants(T, U, P, Fpom, Fcalcite, Fpom_s, Fpom_f, kfast, kslow, dO2_w_local, dH_i_input=nothing)
         # sediment depth vector
         zc, dx, ze, r = Params.prepdepth_geometric(depthSed; dz_top=dz_top, dz_bot=dz_bot, Nz=Nz, r_max=1.10)
         z_resvec = dx
@@ -892,8 +900,8 @@ end
 
         # Organic matter degradation parameters
         krefractory = 0.0
-        kfast = fill(kfast, Nz)
-        kslow = fill(kslow, Nz)
+        kfast = kfast isa AbstractVector ? Float64.(kfast) : fill(Float64(kfast), Nz)
+        kslow = kslow isa AbstractVector ? Float64.(kslow) : fill(Float64(kslow), Nz)
         # ^[/a] from Archer et al (2002)
 
         # Solid fluxes and solid initial conditions
@@ -962,7 +970,7 @@ end
         TR_dCa = Params.TR(z_resvec[1], tort2[1], dbl_dCa)
         zr_Db_0 = 2.0 * z_resvec[1] / D_bio[1]
 
-        # Get it all from CO2System.jl instead, with pH all on Free scale
+        # Get it all from CO2System.jl instead, with pH all on total scale
         co2s = CO2System.CO2SYS(
             1e6dalk_i,
             1e6dtCO2_i,
@@ -996,8 +1004,13 @@ end
         TF = co2s[1, 84][1] * 1e-6rho_sw
         KCa = co2s[1, 86][1] * rho_sw ^ 2
         KAr = co2s[1, 87][1] * rho_sw ^ 2
-        dH_i = @. (10.0 ^ -co2s[:, 35]) * rho_sw
-        dH_i = length(dH_i) == 1 ? dH_i[1] : dH_i
+
+        if dH_i_input === nothing
+            dH_i = @. (10.0 ^ -co2s[:, 35]) * rho_sw
+            dH_i = length(dH_i) == 1 ? dH_i[1] : dH_i
+        else
+            dH_i = dH_i_input
+        end
 
         H_cache = make_H_cache(dH_i, Nz)
         H_diag = make_H_cache(dH_i, Nz)
@@ -1133,9 +1146,13 @@ end
 kfast = Params.kfast(Fpom, Nz, Q10_primary, T, Tref)
 kslow = Params.kslow(Fpom, Nz, Q10_primary, T, Tref)
 
-model_params=calculate_constants(T, U, P, Fpom, Fcalcite, Fpom_s, Fpom_f, kfast, kslow, dO2_w)
+if @isdefined(PERTURBATION_RUN)
+    model_params=calculate_constants(T, U, P, Fpom, Fcalcite, Fpom_s, Fpom_f, kfast, kslow, dO2_w, dH_i)
+else
+    model_params=calculate_constants(T, U, P, Fpom, Fcalcite, Fpom_s, Fpom_f, kfast, kslow, dO2_w)
+end
 
-# %%
+
 const ParamsT = typeof(model_params) # or typeof(proto) if you prefer a separate proto
 
 # %% [markdown]
@@ -1144,35 +1161,59 @@ const ParamsT = typeof(model_params) # or typeof(proto) if you prefer a separate
 # %%
 # Create variables to model
 #make a depth vector filled with the initial conditions from the setup file
-dO2 = fill(dO2_i*model_params.rho_sw, length(model_params.zc))
-dtCO2 = fill(dtCO2_i*model_params.rho_sw, length(model_params.zc))
-dtNO3 = fill(dtNO3_i*model_params.rho_sw, length(model_params.zc))
-dtSO4 = fill(dtSO4_i*model_params.rho_sw, length(model_params.zc))
-dtPO4 = fill(dtPO4_i*model_params.rho_sw, length(model_params.zc))
-dtNH4 = fill(dtNH4_i*model_params.rho_sw, length(model_params.zc))
-dtH2S = fill(dtH2S_i*model_params.rho_sw, length(model_params.zc))
-dFeII = fill(dFeII_i*model_params.rho_sw, length(model_params.zc))
-dMnII = fill(dMnII_i*model_params.rho_sw, length(model_params.zc))
-dCH4 = fill(dCH4_i*model_params.rho_sw, length(model_params.zc))
-dalk = fill(dalk_i*model_params.rho_sw, length(model_params.zc))
-dalk_alloch = fill(dalk_alloch_i*model_params.rho_sw, length(model_params.zc))
-dalk_aerob = fill(dalk_aerob_i*model_params.rho_sw, length(model_params.zc))
-dalk_anaerob = fill(dalk_anaerob_i*model_params.rho_sw, length(model_params.zc))
-dalk_carb = fill(dalk_carb_i*model_params.rho_sw, length(model_params.zc))
+
+function profile(x, rho, Nz)
+    if x isa Number
+        fill(Float64(x) * rho, Nz)
+    elseif @isdefined(PERTURBATION_RUN)
+        vec(Float64.(x))          # already mol/m³, no scaling
+    else
+        vec(Float64.(x)) .* rho   # mol/kg → mol/m³
+    end
+end
+
+profile_solid(x, Nz) = x isa Number ? fill(Float64(x), Nz) : vec(Float64.(x))
+
+Nzloc = length(model_params.zc)
+rho = model_params.rho_sw
+
 dCa_w = 0.02128 / 40.087 * S / 1.80655 #mol/kg
-dCa = fill(dCa_w*model_params.rho_sw, length(model_params.zc))
-pfoc = fill(pfoc_i, length(model_params.zc))
-psoc = fill(psoc_i, length(model_params.zc))
-proc = fill(proc_i, length(model_params.zc))
-pFeOH3 = fill(pFeOH3_i, length(model_params.zc))
-pMnO2 = fill(pMnO2_i, length(model_params.zc))
-pcalcite = fill(pcalcite_i, length(model_params.zc))
-paragonite = fill(paragonite_i, length(model_params.zc))
-pFeS = fill(pFeS_i, length(model_params.zc))
-pFeS2 = fill(pFeS2_i, length(model_params.zc))
-pS0 = fill(pS0_i, length(model_params.zc))
-pFeOH3_PO4 = fill(pFeOH3_PO4_i, length(model_params.zc))
-dH = fill(model_params.dH_i, length(model_params.zc))
+
+dO2   = profile(dO2_i, rho, Nzloc)
+dtCO2 = profile(dtCO2_i, rho, Nzloc)
+dtNO3 = profile(dtNO3_i, rho, Nzloc)
+dtSO4 = profile(dtSO4_i, rho, Nzloc)
+dtPO4 = profile(dtPO4_i, rho, Nzloc)
+dtNH4 = profile(dtNH4_i, rho, Nzloc)
+dtH2S = profile(dtH2S_i, rho, Nzloc)
+dFeII = profile(dFeII_i, rho, Nzloc)
+dMnII = profile(dMnII_i, rho, Nzloc)
+dCH4  = profile(dCH4_i, rho, Nzloc)
+dalk  = profile(dalk_i, rho, Nzloc)
+dalk_alloch  = profile(dalk_alloch_i, rho, Nzloc)
+dalk_aerob   = profile(dalk_aerob_i, rho, Nzloc)
+dalk_anaerob = profile(dalk_anaerob_i, rho, Nzloc)
+dalk_carb    = profile(dalk_carb_i, rho, Nzloc)
+
+
+if @isdefined dCa_i
+    dCa = profile(dCa_i, rho, Nzloc)
+else
+    dCa = fill(dCa_w*model_params.rho_sw, length(model_params.zc))
+    dCa_i = dCa
+end
+
+pfoc = profile_solid(pfoc_i, Nzloc)
+psoc = profile_solid(psoc_i, Nzloc)
+proc = profile_solid(proc_i, Nzloc)
+pFeOH3 = profile_solid(pFeOH3_i, Nzloc)
+pMnO2 = profile_solid(pMnO2_i, Nzloc)
+pcalcite = profile_solid(pcalcite_i, Nzloc)
+paragonite = profile_solid(paragonite_i, Nzloc)
+pFeS = profile_solid(pFeS_i, Nzloc)
+pFeS2 = profile_solid(pFeS2_i, Nzloc)
+pS0 = profile_solid(pS0_i, Nzloc)
+pFeOH3_PO4 = profile_solid(pFeOH3_PO4_i, Nzloc)
 
 #create an input matrix for the solver
 u0 = zeros(26, length(model_params.zc))
@@ -1215,6 +1256,7 @@ function physics_ensamble!(du, u , p ,t)
 
     mp = (p.model_params)::ParamsT     # <- one cast: everything below is inferred
     dO2_w_local = p.dO2_w::Float64
+    dalk_w_local = p.dalk_w::Float64
 
     # --- aliases (typed) ---
     rho_sw  = mp.rho_sw::Float64
@@ -1294,8 +1336,8 @@ function physics_ensamble!(du, u , p ,t)
     FeIIw = (dFeII_w * rho_sw)::Float64
     MnIIw = (dMnII_w * rho_sw)::Float64
     CH4w  = (dCH4_w  * rho_sw)::Float64
-    alkalw= (dalk_w  * rho_sw)::Float64
-    alk_allochw = (dalk_w * rho_sw)::Float64  # Same as open ocean alkalinity
+    alkalw= (dalk_w_local  * rho_sw)::Float64
+    alk_allochw = (dalk_w_local * rho_sw)::Float64  # Same as open ocean alkalinity
     alk_aerobw = 0.0::Float64     # Assume no alkalinity in the water column is from aerobic remineralisation within the sediments ie, products don't accumulate
     alk_anaerobw = 0.0::Float64   # Assume no alkalinity in the water column is from anaerobic remineralisation within the sediments ie, products don't accumulate
     alk_carbw = 0.0::Float64  # Assume no alkalinity in the water column is from carbonate dissolution within the sediments ie, products don't accumulate
@@ -1698,8 +1740,6 @@ prob = ODEProblem(physics_ensamble!, u0, tspan, (
 ))
 
 # %%
-using SparseArrays, LinearSolve, OrdinaryDiffEq
-
 # Block-tridiagonal sparsity pattern (nvar per layer, Nz layers)
 function jac_prototype(mp; nvar=26)
     Nz = length(mp.zc)
@@ -1736,8 +1776,6 @@ prob = ODEProblem(f, u0, tspan, (model_params=model_params, dO2_w=dO2_w,))
 # ### Parallel ensamble run
 
 # %%
-using DiffEqCallbacks
-
 # -----------------------------
 # SWI flux diagnostics (drop-in)
 # -----------------------------
@@ -1782,7 +1820,7 @@ function J_irr_net(u_var::AbstractVector{<:Real}, Cw::Float64,
     end
 end
 
-function compute_swi_fluxes(u, mp, dO2_w_local)
+function compute_swi_fluxes(u, mp, dO2_w_local, dalk_w_local)
     ρ = mp.rho_sw
     phi0 = mp.phi[1]
     dz0 = mp.z_resvec[1]
@@ -1798,8 +1836,8 @@ function compute_swi_fluxes(u, mp, dO2_w_local)
     FeIIw = Main.dFeII_w * ρ
     MnIIw = Main.dMnII_w * ρ
     CH4w  = Main.dCH4_w  * ρ
-    ALKw  = Main.dalk_w  * ρ
-    ALK_allochw = Main.dalk_w * ρ
+    ALKw  = dalk_w_local  * ρ
+    ALK_allochw = dalk_w_local * ρ
     ALK_aerobw = 0.0 * ρ
     ALK_anaerobw = 0.0 * ρ
     ALK_carbw = 0.0 * ρ
@@ -2094,7 +2132,7 @@ function refresh_H_cache_each_step!(u, t, integrator)
 
         Hk = H_from_alk_m3(
             dalkc, dtCO2c, dtNH4c, dtPO4c, dtSO4c, dtH2Sc, mp, T_now;
-            H0 = H0k, iters = 1, damp = 0.4
+            H0 = H0k, iters = 1, damp = 0.4,
         )
 
         Hk = clamp(Hk, HMIN, HMAX)
@@ -2118,8 +2156,6 @@ const cb_commitH = FunctionCallingCallback(commit_H_cache!;
 )
 
 # %%
-using LinearAlgebra, SparseArrays, SparseDiffTools
-using LinearSolve, OrdinaryDiffEq, SciMLBase
 
 # -----------------------------
 # 0) Threading / BLAS
@@ -2172,27 +2208,33 @@ end
 # -----------------------------
 # 2) Build ICs exactly like your single run (mol/kg * rho_sw)
 # -----------------------------
-function make_u0_from_IC(mp, dO2_w_local)
+function make_u0_from_IC(mp, dO2_w_local, dalk_w_local, PERTURBATION_RUN=false)
     Nz = length(mp.zc)
-    ρ = mp.rho_sw
+
+    if PERTURBATION_RUN
+        ρ = 0
+    else
+        ρ = mp.rho_sw
+    end
     u0 = zeros(26, Nz)
-    u0[1, :] .= dO2_w_local * ρ
-    u0[2, :] .= dtCO2_w * ρ
-    u0[3, :] .= dtNO3_w * ρ
-    u0[4, :] .= dtSO4_w * ρ
-    u0[5, :] .= dtPO4_w * ρ
-    u0[6, :] .= dtNH4_w * ρ
-    u0[7, :] .= dtH2S_w * ρ
-    u0[8, :] .= dFeII_w * ρ
-    u0[9, :] .= dMnII_w * ρ
-    u0[10, :] .= dCH4_w * ρ
-    u0[11, :] .= dalk_w * ρ
-    u0[12, :] .= dalk_w * ρ
-    u0[13, :] .= 0.0 * ρ
-    u0[14, :] .= 0.0 * ρ
-    u0[15, :] .= 0.0 * ρ
-    dCa_w = 0.02128 / 40.087 * S / 1.80655
-    u0[16, :] .= dCa_w * ρ
+
+    u0[1, :] .= dO2_i * ρ
+    u0[2, :] .= dtCO2_i * ρ
+    u0[3, :] .= dtNO3_i * ρ
+    u0[4, :] .= dtSO4_i * ρ
+    u0[5, :] .= dtPO4_i * ρ
+    u0[6, :] .= dtNH4_i * ρ
+    u0[7, :] .= dtH2S_i * ρ
+    u0[8, :] .= dFeII_i * ρ
+    u0[9, :] .= dMnII_i * ρ
+    u0[10, :] .= dCH4_i * ρ
+    u0[11, :] .= dalk_i * ρ
+    u0[12, :] .= dalk_alloch_i * ρ
+    u0[13, :] .= dalk_aerob_i * ρ
+    u0[14, :] .= dalk_anaerob_i * ρ
+    u0[15, :] .= dalk_carb_i * ρ
+    # dCa_w = 0.02128 / 40.087 * S / 1.80655
+    u0[16, :] .= dCa_i * ρ
     u0[17, :] .= pfoc_i
     u0[18, :] .= psoc_i
     u0[19, :] .= pFeOH3_i
@@ -2233,8 +2275,9 @@ U_levels        = @isdefined(factorial_U_levels)        ? factorial_U_levels    
 P_levels        = @isdefined(factorial_P_levels)        ? factorial_P_levels        : [P]
 Fcalcite_levels = @isdefined(factorial_Fcalcite_levels) ? factorial_Fcalcite_levels : [Fcalcite]
 O_levels        = @isdefined(factorial_O_levels) ? factorial_O_levels : [dO2_w]
+alk_levels      = @isdefined(factorial_alk_levels)      ? factorial_alk_levels      : [dalk_w]
 
-grid = collect(Iterators.product(T_levels, U_levels, P_levels, Fpom_levels, Fcalcite_levels, O_levels))
+grid = collect(Iterators.product(T_levels, U_levels, P_levels, Fpom_levels, Fcalcite_levels, O_levels, alk_levels))
 trajectories = length(grid)
 
 # Keep your existing downstream structure
@@ -2244,24 +2287,30 @@ new_P        = [g[3] for g in grid]
 new_Fpom     = [g[4] for g in grid]
 new_Fcalcite = [g[5] for g in grid]
 new_O = [g[6] for g in grid]
-
-# new_T = 11.7 
-# new_U = 0.02 
-# new_omegaCa = 2.5
-# new_P = 10.0
-# new_Fpom = 26.0 
-# new_Fcalcite = 0.2 
+new_alk = [g[7] for g in grid]
 
 # Fix a concrete params type
-proto = calculate_constants(new_T[1], new_U[1], new_P[1], 
-    new_Fpom[1], new_Fcalcite[1], 
-    Fpom_s, Fpom_f, kfast, kslow, new_O[1]
-)
+kfast = Params.kfast(new_Fpom[1], Nz, Q10_primary, new_T[1], Tref)
+kslow = Params.kslow(new_Fpom[1], Nz, Q10_primary, new_T[1], Tref)
+
+if @isdefined(PERTURBATION_RUN)
+    proto = calculate_constants(
+        new_T[1], new_U[1], new_P[1],
+        new_Fpom[1], new_Fcalcite[1],    
+        Fpom_s, Fpom_f, kfast, kslow, new_O[1], dH_i
+    )
+else
+    proto = calculate_constants(
+        new_T[1], new_U[1], new_P[1],
+        new_Fpom[1], new_Fcalcite[1],    
+        Fpom_s, Fpom_f, kfast, kslow, new_O[1]
+    )
+end
 
 const ParamsT = typeof(proto)
 
 # --- keep simple per-trajectory metadata (like before) ---
-const ParamMetaT = NamedTuple{(:T, :U, :P, :Fpom, :Fcalcite, :O),NTuple{6,Float64}}
+const ParamMetaT = NamedTuple{(:T, :U, :P, :Fpom, :Fcalcite, :O, :alk),NTuple{7,Float64}}
 param_meta_list = Vector{ParamMetaT}(undef, trajectories)
 for i in 1:trajectories
     param_meta_list[i] = (
@@ -2271,21 +2320,102 @@ for i in 1:trajectories
         Fpom=new_Fpom[i],
         Fcalcite=new_Fcalcite[i],
         O=new_O[i],
+        alk=new_alk[i],
     )
 end
 
 model_params_list = Vector{ParamsT}(undef, trajectories)
 for i in 1:trajectories
-    model_params_list[i] = calculate_constants(
-        new_T[i], new_U[i], new_P[i],
-        new_Fpom[i], new_Fcalcite[i],
-        0.2, 0.8, 18.0, 0.05, new_O[i]
-    )
+
+    kfast = Params.kfast(new_Fpom[i], Nz, Q10_primary, new_T[i], Tref)
+    kslow = Params.kslow(new_Fpom[i], Nz, Q10_primary, new_T[i], Tref)
+
+    if @isdefined(PERTURBATION_RUN)
+        model_params_list[i] = calculate_constants(
+            new_T[i], new_U[i], new_P[i],
+            new_Fpom[i], new_Fcalcite[i],
+            Fpom_s, Fpom_f, kfast, kslow, new_O[i], dH_i
+        )
+    else
+        model_params_list[i] = calculate_constants(
+            new_T[i], new_U[i], new_P[i],
+            new_Fpom[i], new_Fcalcite[i],
+            Fpom_s, Fpom_f, kfast, kslow, new_O[i]
+        )
+    end
 end
 
+function export_model_params_list(model_params_list)
+    T = typeof(model_params_list[1])
+    out = Dict{String,Any}()
+
+    for field in fieldnames(T)
+        vals = [getproperty(mp, field) for mp in model_params_list]
+
+        if all(v -> v isa Number, vals)
+            out[String(field)] = Float64.(vals)
+        elseif all(v -> v isa AbstractVector{<:Number}, vals)
+            n0 = length(vals[1])
+            if all(v -> length(v) == n0, vals)
+                out[String(field)] = hcat(vals...)   # size: (field_length, trajectories)
+            else
+                out[String(field)] = vals            # falls back to MATLAB cell array
+            end
+        else
+            out[String(field)] = vals                # fallback for mixed or unusual types
+        end
+    end
+
+    return out
+end
+
+mp_export = export_model_params_list(model_params_list)
+
+stamp = Dates.format(now(), "yyyymmdd_HHMMSS")
+
+matwrite("model_params_list_$(stamp).mat", Dict(
+    "model_params" => mp_export,
+    "T_vals" => new_T,
+    "U_vals" => new_U,
+    "P_vals" => new_P,
+    "Fpom_vals" => new_Fpom,
+    "Fcalcite_vals" => new_Fcalcite,
+    "O_vals" => new_O,
+    "alk_vals" => new_alk,
+))
+
 # Prebuild u0 and p for all trajectories (no allocs in prob_func)
-u0_list = [make_u0_from_IC(model_params_list[i], new_O[i]) for i in 1:trajectories]
-p_list = [(model_params=model_params_list[i], dO2_w=new_O[i]) for i in 1:trajectories]
+u0_list = [make_u0_from_IC(model_params_list[i], new_O[i], new_alk[i]) for i in 1:trajectories]
+p_list = [(model_params=model_params_list[i], dO2_w=new_O[i], dalk_w=new_alk[i]) for i in 1:trajectories]
+
+# Names in the same order as u0 rows
+var_names = [
+    "dO2", "dtCO2", "dtNO3", "dtSO4", "dtPO4", "dtNH4", "dtH2S", "dFeII", "dMnII", "dCH4",
+    "dalk", "dalk_alloch", "dalk_aerob", "dalk_anaerob", "dalk_carb", "dCa",
+    "pfoc", "psoc", "pFeOH3", "pMnO2", "pcalcite", "paragonite", "pFeS", "pFeS2", "pS0", "pFeOH3_PO4"
+]
+
+# Enforce expected shape
+@assert size(u0, 1) == 26 "Expected 26 parameters (rows) in u0"
+@assert size(u0, 2) == 51 "Expected 51 depth points (columns) in u0"
+
+z = model_params.zc   # depth vector (length 51)
+
+# Save exact 26x51 initial-condition array to MAT
+u0_export = Array{Float64}(u0)
+@show size(u0_export)   # should print (26, 51)
+
+stamp = Dates.format(now(), "yyyymmdd_HHMMSS")
+outname = "u0_initial_conditions_$(stamp).mat"
+
+matwrite(outname, Dict(
+    "u0" => u0_export,        # 26 x 51
+    "var_names" => var_names, # row names
+    "z" => z,                 # depth vector length 51
+    "H_cache" => model_params_list[1].H_cache,  # example H_cache (length 51)
+))
+
+println("Saved: ", outname)
 
 # Pre-warm/calc J-cache for all unique Nz (optional but nice)
 for mp in model_params_list
@@ -2322,7 +2452,7 @@ prob_func = function (prob, i, repeat)
     p_i  = p_list[i]
 
     fcb = SavingCallback(
-        (u, t, integrator) -> compute_swi_fluxes(u, integrator.p.model_params, integrator.p.dO2_w),
+        (u, t, integrator) -> compute_swi_fluxes(u, integrator.p.model_params, integrator.p.dO2_w, integrator.p.dalk_w),
         flux_saved[i];
         save_everystep = false,
         save_start = true,
@@ -2474,13 +2604,8 @@ for i in eachindex(sols)
     end
 end
 
-# %%
-size(sols[1])
-sols[1].t
 
 # %%
-using DataFrames
-
 const FLUX_CONV = 1000.0 / 365.25   # mol m^-2 yr^-1 -> mmol m^-2 d^-1
 
 """
@@ -2581,8 +2706,6 @@ var_names = [
 # heatmaps
 
 # %%
-using Dates
-using UUIDs
 
 function resolve_output_dir()
     # Optional explicit override, useful both locally and on HPC.
@@ -2626,7 +2749,7 @@ flux_lens = [length(flux_saved[i].t) for i in 1:trajectories]
 flux_nmax = maximum(flux_lens)
 
 expected_nt = length(collect(flux_saveat))
-Nvar, Nz    = size(sols[1].u[1])
+Nvar    = size(sols[1].u[1])
 
 for i in 1:trajectories
     if flux_lens[i] < flux_nmax
@@ -2761,8 +2884,141 @@ matwrite(out_path, merge(
     "Jdiff"           => Jdiff_mat,
     "Jirr"            => Jirr_mat,
     "reaction_export" => reaction_export,
+    "model_params"    => export_model_params_list(model_params_list),
+    "param_meta_list" => param_meta_list,
 )))
 
 
 println("[sweep] Done. Output written to ", out_path)
 flush(stdout)
+
+
+## Save input values from IC module
+
+# Domain characteristics
+domain_characteristics = Dict{String,Any}(
+    "depthSed" => depthSed,
+    "dz_top" => dz_top,
+    "dz_bot" => dz_bot,
+    "Nz" => Nz,
+    "tspan" => [Float64(first(tspan)), Float64(last(tspan))],
+    "depth" => HF2_shallow_fact_params.depth,    
+    "permeability" => permeability,
+    "U" => U,
+    "phiInf" => phiInf,
+    "phi0" => phi0,
+    "beta" => beta,
+    "lambda_b" => lambda_b,
+    "lambda_i" => lambda_i,
+    "T_mean" => T_mean,
+    "T_amp" => T_amp,
+    "T_period" => T_period,
+    "T_phase" => T_phase,
+    "S" => S,
+    "P" => P
+)
+
+water_values = Dict{String,Any}(
+    "dO2_w" => O_levels,
+    "dtCO2_w" => dtCO2_w,
+    "dtNO3_w" => dtNO3_w,
+    "dtSO4_w" => dtSO4_w,
+    "dtNH4_w" => dtNH4_w,
+    "dalk_w" => dalk_w,
+    "dalk_alloch_w" => HF2_shallow_fact_params.dalk_alloch_w,
+    "dalk_aerob_w" => HF2_shallow_fact_params.dalk_aerob_w,
+    "dalk_anaerob_w" => HF2_shallow_fact_params.dalk_anaerob_w,
+    "dalk_carb_w" => HF2_shallow_fact_params.dalk_carb_w,
+    "dtPO4_w" => HF2_shallow_fact_params.dtPO4_w,
+    "dtH2S_w" => HF2_shallow_fact_params.dtH2S_w,
+    "dCH4_w" => HF2_shallow_fact_params.dCH4_w,
+    "dFeII_w" => HF2_shallow_fact_params.dFeII_w,
+    "dMnII_w" => HF2_shallow_fact_params.dMnII_w,
+    "dSi_w" => HF2_shallow_fact_params.dSi_w,
+)
+
+solid_fluxes = Dict{String,Any}(
+    "Fpom" => Fpom_levels,
+    "Fpom_r" => Fpom_r,
+    "Fpom_s" => Fpom_s,
+    "Fpom_f" => Fpom_f,
+    "FMnO2" => FMnO2,
+    "FFeOH3" => FFeOH3,
+    "Fcalcite" => Fcalcite_levels,
+    "Faragonite" => Faragonite,
+    "Fclay" => Fclay,
+    "FFeS" => FFeS,
+    "FFeS2" => FFeS2,
+    "FS0" => FS0,
+    "FFeOH3_PO4" => FFeOH3_PO4,
+    "rho_p" => rho_p,
+)
+
+init_sed_diss_values = Dict{String,Any}(
+    "dO2_i" => dO2_i,
+    "dtCO2_i" => dtCO2_i,
+    "dtNO3_i" => dtNO3_i,
+    "dtSO4_i" => dtSO4_i,
+    "dtNH4_i" => dtNH4_i,
+    "dalk_i" => dalk_i,
+    "dalk_alloch_i" => dalk_alloch_i,
+    "dalk_aerob_i" => dalk_aerob_i,
+    "dalk_anaerob_i" => dalk_anaerob_i,
+    "dalk_carb_i" => dalk_carb_i,
+    "dtPO4_i" => dtPO4_i,
+    "dtH2S_i" => dtH2S_i,
+    "dFeII_i" => dFeII_i,
+    "dMnII_i" => dMnII_i,
+    "dCH4_i" => dCH4_i,
+)
+
+init_sed_solid_values = Dict{String,Any}(
+    "pfoc_i" => pfoc_i,
+    "psoc_i" => psoc_i,
+    "proc_i" => proc_i,
+    "pFeOH3_i" => pFeOH3_i,
+    "pMnO2_i" => pMnO2_i,
+    "pcalcite_i" => pcalcite_i,
+    "paragonite_i" => paragonite_i,
+    "pclay_i" => HF2_shallow_fact_params.pclay_i,
+    "pFeS_i" => pFeS_i,
+    "pFeS2_i" => pFeS2_i,
+    "pS0_i" => pS0_i,
+    "pFeOH3_PO4_i" => pFeOH3_PO4_i,
+)
+
+carb_schemes = Dict{String,Any}(
+    "calcite_diss_scheme" => calcite_diss_scheme,
+    "aragonite_diss_scheme" => aragonite_diss_scheme,
+    "calcite_precip_scheme" => calcite_precip_scheme,
+)
+
+Q10_setup = Dict{String,Any}(
+    "Q10_primary" => Q10_primary,
+    "Q10_secondary" => Q10_secondary,
+    "Tref" => Tref,
+)
+
+factorial_values = Dict{String,Any}(
+    "T_levels" => T_levels,
+    "Fpom_levels" => Fpom_levels,
+    "U_levels" => U_levels,
+    "P_levels" => P_levels,
+    "Fcalcite_levels" => Fcalcite_levels,
+    "O_levels" => O_levels,
+    "alk_levels" => alk_levels,
+    "param_meta_list" => param_meta_list,
+)
+
+input_data = Dict{String,Any}(
+    "domain_characteristics" => domain_characteristics,
+    "water_values" => water_values,
+    "solid_fluxes" => solid_fluxes,
+    "init_sed_diss_values" => init_sed_diss_values,
+    "init_sed_solid_values" => init_sed_solid_values,
+    "carb_schemes" => carb_schemes,
+    "Q10_setup" => Q10_setup,
+    "factorial_values" => factorial_values,
+)
+
+matwrite("input_data_$(stamp).mat", input_data)
