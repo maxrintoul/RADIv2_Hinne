@@ -29,10 +29,10 @@ IC_FILES=(
 # Format: "ncpus mem_GB"
 CORE_CONFIGS=(
     # "4 16"
-    # "8 32"
+    "8 32"
     # "16 64"
     # "32 128"
-    "48 192"
+    # "48 192"
 )
 
 # ---- Tolerance pairs (abstol reltol) ----------------------------------
