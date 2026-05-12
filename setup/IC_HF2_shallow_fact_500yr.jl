@@ -144,7 +144,7 @@ factorial_T_levels        = [10.0]
 factorial_Fpom_levels     = [33.52618867924528*0.1, 33.52618867924528, 33.52618867924528*10.0]
 factorial_U_levels        = [U]
 factorial_P_levels        = [P]
-factorial_calcite_levels = [0.01, 0.1, 1.0]
+factorial_calcite_levels  = [0.01, 0.1, 1.0]
 factorial_O_levels        = [20, 100, 200, 400] * 1e-6
 
 end

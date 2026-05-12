@@ -2273,7 +2273,7 @@ T_levels        = @isdefined(factorial_T_levels)        ? factorial_T_levels    
 Fpom_levels     = @isdefined(factorial_Fpom_levels)     ? factorial_Fpom_levels     : [Fpom]
 U_levels        = @isdefined(factorial_U_levels)        ? factorial_U_levels        : [U]
 P_levels        = @isdefined(factorial_P_levels)        ? factorial_P_levels        : [P]
-Fcalcite_levels = @isdefined(factorial_Fcalcite_levels) ? factorial_Fcalcite_levels : [Fcalcite]
+Fcalcite_levels = @isdefined(factorial_calcite_levels)  ? factorial_calcite_levels  : [Fcalcite]
 O_levels        = @isdefined(factorial_O_levels) ? factorial_O_levels : [dO2_w]
 alk_levels      = @isdefined(factorial_alk_levels)      ? factorial_alk_levels      : [dalk_w]
 
