@@ -23,7 +23,7 @@ dz_top = 0.2e-3 # depth resolution at top of sediment
 dz_bot = 5e-2   # depth resolution at bottom of sediment
 Nz = 51         # number of depth layers
 
-tspan = (0.0, 1.0) # in years
+tspan = (0.0, 500.0) # in years
 
 # +
 # wave
