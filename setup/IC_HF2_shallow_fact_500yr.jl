@@ -1,6 +1,8 @@
 ### Site-specific initial conditions from read_data_set_max.ipynb ###
 ### Site: HF2 ###
 
+module HF2_shallow_fact_params
+
 # Define model depth steps (all depths in metres)
 depthSed = 0.2  # depth of the sediment
 dz_top = 0.2e-3 # depth resolution at top of sediment
@@ -130,3 +132,5 @@ factorial_U_levels        = [U]
 factorial_P_levels        = [P]
 factorial_Fcalcite_levels = [0.01, 0.1, 1.0]
 factorial_O_levels        = [20, 100, 200, 400] * 1e-6
+
+end
