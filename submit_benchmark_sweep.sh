@@ -84,7 +84,7 @@ for ic in "${IC_FILES[@]}"; do
                     -l walltime=${WALLTIME} \
                     -l ncpus=${ncpus} \
                     -l mem=${mem}GB \
-                    -l storage=scratch/zn44 \
+                    -l storage=scratch/zn44+scratch/jk72 \
                     -N radi_${tag} \
                     -v "IC_FILE=${ic},ABSTOL=${abstol},RELTOL=${reltol},RUN_TAG=${tag}" \
                     "/home/581/mr9897/RADIv2_Hinne/benchmarking_sweep_run.sh" "
@@ -94,7 +94,7 @@ for ic in "${IC_FILES[@]}"; do
                     -l walltime=${WALLTIME} \
                     -l ncpus=${ncpus} \
                     -l mem=${mem}GB \
-                    -l storage=scratch/zn44 \
+                    -l storage=scratch/zn44+scratch/jk72 \
                     -N radi_${tag} \
                     -v "IC_FILE=${ic},ABSTOL=${abstol},RELTOL=${reltol},RUN_TAG=${tag}" \
                     "/home/581/mr9897/RADIv2_Hinne/benchmarking_sweep_run.sh"
