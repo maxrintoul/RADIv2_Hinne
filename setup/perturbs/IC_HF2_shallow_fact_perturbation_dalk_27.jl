@@ -15,7 +15,20 @@ export depthSed, dz_top, dz_bot, Nz, tspan, depth, permeability, U, phiInf, phi0
 
 PERTURBATION_RUN = true
 
-const MODULE_DIR = normpath(joinpath(@__DIR__, "modules"))
+const MODULE_DIR = let
+candidates = (
+        get(ENV, "RADI_MODULE_DIR", ""),
+        normpath(joinpath(@__DIR__, "modules")),
+        normpath(joinpath(@__DIR__, "..", "modules")),
+        normpath(joinpath(@__DIR__, "..", "..", "modules")),
+    )
+    idx = findfirst(d -> !isempty(d) && isdir(d), candidates)
+    idx === nothing && error(
+        "Could not locate modules directory. Tried: " * join(candidates, ", ")
+    )
+    candidates[idx]
+end
+
 include(joinpath(MODULE_DIR, "gsw_rho.jl"))
 
 # Define model depth steps (all depths in metres)
