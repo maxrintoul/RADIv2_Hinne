@@ -57,7 +57,7 @@ include("modules/Params.jl");
 # @everywhere include("setup/IC_IberianMargin_shallow.jl");
 # @everywhere include("setup/IC_HF2_shallow.jl");
 @everywhere include(_ic_file);
-@everywhere using .HF2_shallow_fact_params
+@everywhere using .ICs
 
 # %% [markdown]
 # ### Functions running inside the ODE Solver

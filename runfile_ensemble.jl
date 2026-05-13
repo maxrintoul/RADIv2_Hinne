@@ -56,7 +56,7 @@ include("modules/Params.jl");
 # @everywhere include("setup/IC_CS2_2_shallow.jl");
 
 @everywhere include("setup/IC_HF2_shallow_fact.jl");
-@everywhere using .HF2_shallow_fact_params
+@everywhere using .ICs
 # @everywhere include("IC_HF2_shallow_fact_perturbation_dalk_0p002826.jl");
 # @everywhere using .perturbation_ICs
 
