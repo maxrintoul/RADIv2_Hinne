@@ -22,7 +22,9 @@ IC_FILES=(
     # "/home/581/mr9897/RADIv2_Hinne/setup/IC_HF2_shallow_fact_1yr.jl"
     # "/home/581/mr9897/RADIv2_Hinne/setup/IC_HF2_shallow_fact_10yr.jl"
     # "/home/581/mr9897/RADIv2_Hinne/setup/IC_HF2_shallow_fact_100yr.jl"
-    "/home/581/mr9897/RADIv2_Hinne/setup/IC_HF2_shallow_fact_500yr.jl"
+    # "/home/581/mr9897/RADIv2_Hinne/setup/IC_HF2_shallow_fact_500yr.jl"
+    "/home/581/mr9897/RADIv2_Hinne/setup/IC_HF2_shallow_fact_perturbation_dalk_1.jl"
+    "/home/581/mr9897/RADIv2_Hinne/setup/IC_HF2_shallow_fact_perturbation_dalk_36.jl"
 )
 
 # ---- Core/memory pairs (ncpus mem_GB) ---------------------------------
@@ -44,7 +46,7 @@ TOL_CONFIGS=(
 )
 
 # ---- Walltime (adjust if needed) -------------------------------------
-WALLTIME="24:00:00"
+WALLTIME="05:00:00"
 
 # ---- Submit ----------------------------------------------------------
 total=0
