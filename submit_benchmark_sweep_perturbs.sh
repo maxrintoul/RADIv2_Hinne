@@ -18,11 +18,8 @@ DRY_RUN=${DRY_RUN:-0}
 
 # ---- IC files (timespan controls steady-state approach) ---------------
 IC_FILES=(
-    "/home/581/mr9897/RADIv2_Hinne/setup/perturbs/IC_HF2_shallow_fact_perturbation_dalk_9.jl"
-    "/home/581/mr9897/RADIv2_Hinne/setup/perturbs/IC_HF2_shallow_fact_perturbation_dalk_18.jl"
-    "/home/581/mr9897/RADIv2_Hinne/setup/perturbs/IC_HF2_shallow_fact_perturbation_dalk_27.jl"
-    "/home/581/mr9897/RADIv2_Hinne/setup/perturbs/IC_HF2_shallow_fact_perturbation_dalk_36.jl"
-
+    "/home/581/mr9897/RADIv2_Hinne/setup/IC_HF2_shallow_fact_perturbation_dalk_1.jl"
+    "/home/581/mr9897/RADIv2_Hinne/setup/IC_HF2_shallow_fact_perturbation_dalk_36.jl"
 )
 
 # ---- Core/memory pairs (ncpus mem_GB) ---------------------------------
@@ -44,7 +41,7 @@ TOL_CONFIGS=(
 )
 
 # ---- Walltime (adjust if needed) -------------------------------------
-WALLTIME="02:00:00"
+WALLTIME="05:00:00"
 
 # ---- Submit ----------------------------------------------------------
 total=0
