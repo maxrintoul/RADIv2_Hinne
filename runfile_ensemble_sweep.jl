@@ -2436,7 +2436,8 @@ prob_base = ODEProblem(f0, u0_list[1], tspan, p_list[1])
 # 5) prob_func
 # -----------------------------
 # Save times (choose what you want; years in your setup)
-flux_saveat = 0.0:1:tspan[2]
+flux_saveat = ICs.flux_saveat
+# flux_saveat = 0.0:1:tspan[2]
 # flux_saveat = vcat(
 #     0.0:0.01:1.0, 
 #     1.1:0.1:8.0, 
