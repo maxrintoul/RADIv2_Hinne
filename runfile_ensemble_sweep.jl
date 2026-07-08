@@ -2075,7 +2075,8 @@ end
 
 # Choose when to save diagnostics (in model time units; your notebook uses years)
 # Example: save every 0.1 yr. Adjust as needed.
-flux_saveat = 0.0:1:(Main.tspan[2])
+# flux_saveat = 0.0:1:(Main.tspan[2])
+flux_saveat = ICs.flux_saveat
 
 # Optional detailed reaction-rate saving.
 # Set `save_reaction_rates = true` to store a full depth profile of all reactions.
