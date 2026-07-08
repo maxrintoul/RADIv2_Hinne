@@ -61,7 +61,7 @@ lambda_b = 0.08  # /m  # no corresponding value found in read_data_set_max.ipynb
 lambda_i = 0.05  # /m  # no corresponding value found in read_data_set_max.ipynb
 
 # Define overlying water column properties
-T_mean = 8.16577142857143 # °C
+T_mean = 10.0 # °C
 T_amp = 0.0 # °C
 T_period = 1.0 # years
 T_phase = 0.0 # years

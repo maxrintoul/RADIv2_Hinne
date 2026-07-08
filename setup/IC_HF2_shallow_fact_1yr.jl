@@ -1,6 +1,22 @@
 ### Site-specific initial conditions from read_data_set_max.ipynb ###
 ### Site: HF2 ###
 
+module ICs
+
+export depthSed, dz_top, dz_bot, Nz, tspan, depth, permeability, U, phiInf, phi0, beta, lambda_b, lambda_i,
+       T_mean, T_amp, T_period, T_phase, T, S, P, rho_sw, dO2_w, dtCO2_w, dtNO3_w, dtSO4_w, dtNH4_w, dalk_w, 
+       dalk_alloch_w, dalk_aerob_w, dalk_anaerob_w, dalk_carb_w, dtPO4_w, dtH2S_w, dCH4_w, dFeII_w, dMnII_w,
+       dSi_w, Fpom, Fpom_r, Fpom_s, Fpom_f, FMnO2, FFeOH3, Fcalcite, Faragonite, Fclay, FFeS, FFeS2, FS0, 
+       FFeOH3_PO4, rho_p, dO2_i, dtCO2_i, dtNO3_i, dtSO4_i, dtNH4_i, dalk_i, dalk_alloch_i, dalk_aerob_i, 
+       dalk_anaerob_i, dalk_carb_i, dtPO4_i, dtH2S_i, dFeII_i, dMnII_i, dCH4_i, pfoc_i, psoc_i, proc_i,
+       pFeOH3_i, pMnO2_i, pcalcite_i, paragonite_i, pclay_i, pFeS_i, pFeS2_i, pS0_i, pFeOH3_PO4_i,
+       calcite_diss_scheme, aragonite_diss_scheme, calcite_precip_scheme, Q10_primary, Q10_secondary, 
+       Tref, factorial_T_levels, factorial_Fpom_levels, factorial_U_levels, factorial_P_levels, 
+       factorial_calcite_levels, factorial_O_levels, factorial_alk_levels
+
+const MODULE_DIR = normpath(joinpath(@__DIR__, "..", "modules"))
+include(joinpath(MODULE_DIR, "gsw_rho.jl"))
+
 # Define model depth steps (all depths in metres)
 depthSed = 0.2  # depth of the sediment
 dz_top = 0.2e-3 # depth resolution at top of sediment
@@ -125,8 +141,10 @@ Tref = 9.0          # no corresponding value found in read_data_set_max.ipynb
 
 # Optional factorial controls
 factorial_T_levels        = [10.0]
-factorial_Fpom_levels     = [33.52618867924528*1.25, 33.52618867924528*5.0, 33.52618867924528*10.0]
+factorial_Fpom_levels     = [33.52618867924528] # [33.52618867924528*1.25, 33.52618867924528*5.0, 33.52618867924528*10.0]
 factorial_U_levels        = [U]
 factorial_P_levels        = [P]
-factorial_Fcalcite_levels = [0.01, 0.1, 1.0]
-factorial_O_levels        = [20.0, 100, 200, 400] * 1e-6
+factorial_Fcalcite_levels = 0.01 # [0.01, 0.1, 1.0]
+factorial_O_levels        = 20.0 * 1e-6 # [20.0, 100, 200, 400] * 1e-6
+
+end # module ICs

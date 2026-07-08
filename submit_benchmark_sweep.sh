@@ -23,8 +23,6 @@ IC_FILES=(
     # "/home/581/mr9897/RADIv2_Hinne/setup/IC_HF2_shallow_fact_10yr.jl"
     # "/home/581/mr9897/RADIv2_Hinne/setup/IC_HF2_shallow_fact_100yr.jl"
     # "/home/581/mr9897/RADIv2_Hinne/setup/IC_HF2_shallow_fact_500yr.jl"
-    "/home/581/mr9897/RADIv2_Hinne/setup/IC_HF2_shallow_fact_perturbation_dalk_1.jl"
-    "/home/581/mr9897/RADIv2_Hinne/setup/IC_HF2_shallow_fact_perturbation_dalk_36.jl"
 )
 
 # ---- Core/memory pairs (ncpus mem_GB) ---------------------------------

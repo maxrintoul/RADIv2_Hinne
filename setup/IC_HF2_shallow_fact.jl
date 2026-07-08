@@ -1,7 +1,7 @@
 ### Site-specific initial conditions from read_data_set_max.ipynb ###
 ### Site: HF2 ###
 
-module HF2_shallow_fact_params
+module ICs
 
 export depthSed, dz_top, dz_bot, Nz, tspan, depth, permeability, U, phiInf, phi0, beta, lambda_b, lambda_i,
        T_mean, T_amp, T_period, T_phase, T, S, P, rho_sw, dO2_w, dtCO2_w, dtNO3_w, dtSO4_w, dtNH4_w, dalk_w, 
@@ -12,7 +12,7 @@ export depthSed, dz_top, dz_bot, Nz, tspan, depth, permeability, U, phiInf, phi0
        pFeOH3_i, pMnO2_i, pcalcite_i, paragonite_i, pclay_i, pFeS_i, pFeS2_i, pS0_i, pFeOH3_PO4_i,
        calcite_diss_scheme, aragonite_diss_scheme, calcite_precip_scheme, Q10_primary, Q10_secondary, 
        Tref, factorial_T_levels, factorial_Fpom_levels, factorial_U_levels, factorial_P_levels, 
-       factorial_calcite_levels, factorial_O_levels, factorial_alk_levels
+       factorial_calcite_levels, factorial_O_levels, factorial_alk_levels, save_dt, flux_saveat
 
 const MODULE_DIR = normpath(joinpath(@__DIR__, "..", "modules"))
 include(joinpath(MODULE_DIR, "gsw_rho.jl"))
@@ -24,6 +24,8 @@ dz_bot = 5e-2   # depth resolution at bottom of sediment
 Nz = 51         # number of depth layers
 
 tspan = (0.0, 2.0) # in years
+save_dt = 0.01 # save every 0.01 yr. Adjust as needed.
+flux_saveat = 0.0:save_dt:tspan[2] # save fluxes at every save_dt interval (in years)
 
 # wave
 # wave_height = 1.0 #[m]  # no corresponding value found in read_data_set_max.ipynb
@@ -147,4 +149,4 @@ factorial_calcite_levels  = [0.01] #, 0.1] # [0.01, 0.1, 1.0]
 factorial_O_levels        = [20.0] * 1e-6 #, 100.0, 200.0]* 1e-6 #, 100, 200, 400] * 1e-6
 # factorial_alk_levels      = [dalk_w, 0.9*dalk_w, 1.1*dalk_w]
 
-end # module HF2_shallow_fact_params
+end # module ICs
