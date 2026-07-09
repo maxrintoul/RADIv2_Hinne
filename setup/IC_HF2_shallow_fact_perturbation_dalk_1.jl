@@ -37,9 +37,9 @@ dz_top = 0.0002 # depth resolution at top of sediment
 dz_bot =0.05   # depth resolution at bottom of sediment
 Nz = 51         # number of depth layers
 
-tspan = (0.0, 1.0) # in years
-save_dt = 0.00011415525114155251 # save every 0.01 yr. Adjust as needed.
-flux_saveat = 0.0:0.00011415525114155251:1.0 # save fluxes at every save_dt interval (in years)
+tspan = (0.0, 30.0) # in years
+save_dt = 1 # save every 0.01 yr. Adjust as needed.
+flux_saveat = 0.0:1:30.0 # save fluxes at every save_dt interval (in years)
 
 # wave
 # wave_height = 1.0 #[m]  # no corresponding value found in read_data_set_max.ipynb

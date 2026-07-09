@@ -19,6 +19,14 @@ DRY_RUN=${DRY_RUN:-0}
 # ---- IC files (timespan controls steady-state approach) ---------------
 IC_FILES=(
     "/home/581/mr9897/RADIv2_Hinne/setup/IC_HF2_shallow_fact_perturbation_dalk_1.jl"
+    "/home/581/mr9897/RADIv2_Hinne/setup/IC_HF2_shallow_fact_perturbation_dalk_2.jl"
+    "/home/581/mr9897/RADIv2_Hinne/setup/IC_HF2_shallow_fact_perturbation_dalk_3.jl"
+    "/home/581/mr9897/RADIv2_Hinne/setup/IC_HF2_shallow_fact_perturbation_dalk_4.jl"
+    "/home/581/mr9897/RADIv2_Hinne/setup/IC_HF2_shallow_fact_perturbation_dalk_5.jl"
+    "/home/581/mr9897/RADIv2_Hinne/setup/IC_HF2_shallow_fact_perturbation_dalk_6.jl"
+    "/home/581/mr9897/RADIv2_Hinne/setup/IC_HF2_shallow_fact_perturbation_dalk_7.jl"
+    "/home/581/mr9897/RADIv2_Hinne/setup/IC_HF2_shallow_fact_perturbation_dalk_8.jl"
+    "/home/581/mr9897/RADIv2_Hinne/setup/IC_HF2_shallow_fact_perturbation_dalk_9.jl"
     # "/home/581/mr9897/RADIv2_Hinne/setup/IC_HF2_shallow_fact_perturbation_dalk_36.jl"
 )
 
