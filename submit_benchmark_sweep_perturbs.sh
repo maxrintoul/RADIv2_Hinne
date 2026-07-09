@@ -84,7 +84,7 @@ for ic in "${IC_FILES[@]}"; do
                     -l ncpus=${ncpus} \
                     -l mem=${mem}GB \
                     -l storage=scratch/zn44+scratch/jk72 \
-                    -o "${LOG_DIR}/"
+                    -o "${LOG_DIR}/"\
                     -N radi_${tag} \
                     -v "IC_FILE=${ic},ABSTOL=${abstol},RELTOL=${reltol},RUN_TAG=${tag}" \
                     "/home/581/mr9897/RADIv2_Hinne/benchmarking_sweep_run.sh" "
@@ -95,7 +95,7 @@ for ic in "${IC_FILES[@]}"; do
                     -l ncpus=${ncpus} \
                     -l mem=${mem}GB \
                     -l storage=scratch/zn44+scratch/jk72 \
-                    -o "${LOG_DIR}/"
+                    -o "${LOG_DIR}/"\
                     -N radi_${tag} \
                     -v "IC_FILE=${ic},ABSTOL=${abstol},RELTOL=${reltol},RUN_TAG=${tag}" \
                     "/home/581/mr9897/RADIv2_Hinne/benchmarking_sweep_run.sh"
