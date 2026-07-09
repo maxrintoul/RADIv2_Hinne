@@ -45,7 +45,7 @@ dalk_perturbations = dalk_perturbations = collect(0:50:1000) .* 1e-6 # .- base_d
 dalk_vals = Float64.(base_dalk .+ dalk_perturbations)
 
 ## Trajectories to perform perturbations on
-trajectories = 1:9
+trajectories = 10:36 # 1:9
 
 # dalk_vals = steady_state_input["water_values"]["dalk_w"] .+ (0.0) # :0.0001:0.0005) # example perturbation values for alkalinity in overlying water column (50% decrease, no change, 50% increase)
 # dalk_vals = collect(dalk_vals)
