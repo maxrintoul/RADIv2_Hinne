@@ -22,7 +22,7 @@ IC_FILES=(
     # "/home/581/mr9897/RADIv2_Hinne/setup/IC_HF2_shallow_fact_1yr.jl"
     # "/home/581/mr9897/RADIv2_Hinne/setup/IC_HF2_shallow_fact_10yr.jl"
     # "/home/581/mr9897/RADIv2_Hinne/setup/IC_HF2_shallow_fact_100yr.jl"
-    # "/home/581/mr9897/RADIv2_Hinne/setup/IC_HF2_shallow_fact_500yr.jl"
+    "/home/581/mr9897/RADIv2_Hinne/setup/IC_HF2_shallow_fact_500yr.jl"
 )
 
 # ---- Core/memory pairs (ncpus mem_GB) ---------------------------------
@@ -77,9 +77,9 @@ for ic in "${IC_FILES[@]}"; do
                 echo "[DRY_RUN] qsub -N radi_${tag} -l ncpus=${ncpus} -l mem=${mem}GB -l walltime=${WALLTIME} -v NCPUS=${ncpus},MEM=${mem},IC_FILE=${ic},ABSTOL=${abstol},RELTOL=${reltol},RUN_TAG=${tag} /home/581/mr9897/RADIv2_Hinne/benchmarking_sweep_run.sh"
             else
                 echo "Submitting: $tag"
-                echo "qsub -P zn44 -q normal -l walltime=${WALLTIME} -l ncpus=${ncpus} -l mem=${mem}GB -l storage=scratch/zn44+scratch/jk72 -N radi_${tag} -v "IC_FILE=${ic},ABSTOL=${abstol},RELTOL=${reltol},RUN_TAG=${tag}" "/home/581/mr9897/RADIv2_Hinne/benchmarking_sweep_run.sh""
+                echo "qsub -P jk72 -q normal -l walltime=${WALLTIME} -l ncpus=${ncpus} -l mem=${mem}GB -l storage=scratch/zn44+scratch/jk72 -N radi_${tag} -v "IC_FILE=${ic},ABSTOL=${abstol},RELTOL=${reltol},RUN_TAG=${tag}" "/home/581/mr9897/RADIv2_Hinne/benchmarking_sweep_run.sh""
                 echo "qsub \
-                    -P zn44 \
+                    -P jk72 \
                     -q normal \
                     -l walltime=${WALLTIME} \
                     -l ncpus=${ncpus} \
@@ -89,7 +89,7 @@ for ic in "${IC_FILES[@]}"; do
                     -v "IC_FILE=${ic},ABSTOL=${abstol},RELTOL=${reltol},RUN_TAG=${tag}" \
                     "/home/581/mr9897/RADIv2_Hinne/benchmarking_sweep_run.sh" "
                 qsub \
-                    -P zn44 \
+                    -P jk72 \
                     -q normal \
                     -l walltime=${WALLTIME} \
                     -l ncpus=${ncpus} \
