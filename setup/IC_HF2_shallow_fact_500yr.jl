@@ -1,7 +1,7 @@
 ### Site-specific initial conditions from read_data_set_max.ipynb ###
 ### Site: HF2 ###
 
-module HF2_shallow_fact_params
+module ICs
 
 export depthSed, dz_top, dz_bot, Nz, tspan, depth, permeability, U, phiInf, phi0, beta, lambda_b, lambda_i,
        T_mean, T_amp, T_period, T_phase, T, S, P, rho_sw, dO2_w, dtCO2_w, dtNO3_w, dtSO4_w, dtNH4_w, dalk_w, 
