@@ -12,7 +12,7 @@ export depthSed, dz_top, dz_bot, Nz, tspan, depth, permeability, U, phiInf, phi0
        pFeOH3_i, pMnO2_i, pcalcite_i, paragonite_i, pclay_i, pFeS_i, pFeS2_i, pS0_i, pFeOH3_PO4_i,
        calcite_diss_scheme, aragonite_diss_scheme, calcite_precip_scheme, Q10_primary, Q10_secondary, 
        Tref, factorial_T_levels, factorial_Fpom_levels, factorial_U_levels, factorial_P_levels, 
-       factorial_calcite_levels, factorial_O_levels, factorial_alk_levels
+       factorial_calcite_levels, factorial_O_levels, factorial_alk_levels, save_dt, flux_saveat
 
 const MODULE_DIR = normpath(joinpath(@__DIR__, "..", "modules"))
 include(joinpath(MODULE_DIR, "gsw_rho.jl"))
@@ -24,6 +24,8 @@ dz_bot = 5e-2   # depth resolution at bottom of sediment
 Nz = 51         # number of depth layers
 
 tspan = (0.0, 500.0) # in years
+save_dt = 1.0 # save every 1 yr. Adjust as needed.
+flux_saveat = 0.0:save_dt:tspan[2] # save fluxes at every save_dt interval (in years)
 
 # +
 # wave
