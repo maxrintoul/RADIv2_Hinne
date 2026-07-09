@@ -41,7 +41,7 @@ to_float_vec(x) = x isa Number ? [Float64(x)] : Float64.(vec(x))
 base_dalk = Float64(steady_state_input["water_values"]["dalk_w"])
 #dalk_perturbations = 10 .^ range(-10, log10(4.999189479151586e+04), length=101)./ 1e6 # example perturbation values for alkalinity in overlying water column (from 0.00001 to 0.05 mol/kg, converted from mol/m^3 using seawater density values from model output)
 # dalk_perturbations = 10 .^ range(-10, log10(4.999189479151586e+04), length=5)./ 1e6 .- base_dalk # example perturbation values for alkalinity in overlying water column (from 0.00001 to 0.05 mol/kg, converted from mol/m^3 using seawater density values from model output)
-dalk_perturbations = [0, 10, 20, 30, 40, 50] .* 1e-6 # .- base_dalk # example perturbation values for alkalinity in overlying water column (from 0.00001 to 0.05 mol/kg, converted from mol/m^3 using seawater density values from model output)
+dalk_perturbations = dalk_perturbations = collect(0:50:1000) .* 1e-6 # .- base_dalk # example perturbation values for alkalinity in overlying water column (from 0.00001 to 0.05 mol/kg, converted from mol/m^3 using seawater density values from model output)
 dalk_vals = Float64.(base_dalk .+ dalk_perturbations)
 
 ## Trajectories to perform perturbations on
