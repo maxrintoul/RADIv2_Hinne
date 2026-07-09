@@ -207,7 +207,7 @@ function write_perturbation_input_files(
     dMnII_i = $(final_output_dict["dMnII"][:, trajectory] ./ rho_sw_vals)  # no corresponding value found in read_data_set_max.ipynb
     dCH4_i  = $(final_output_dict["dCH4"][:, trajectory] ./ rho_sw_vals)   # no corresponding value found in read_data_set_max.ipynb
     dCa_i   = $(final_output_dict["dCa"][:, trajectory] ./ rho_sw_vals)    # no corresponding value found in read_data_set_max.ipynb
-    dH_i    = $(final_output_dict["H"][:, trajectory] ./ rho_sw_vals)      # depth profile from final model output, to be used in perturbation runs
+    dH_i    = $(final_output_dict["H"][:, trajectory])      # depth profile from final model output, to be used in perturbation runs
 
     pfoc_i       = $(final_output_dict["pfoc"][:, trajectory])  # no corresponding value found in read_data_set_max.ipynb
     psoc_i       = $(final_output_dict["psoc"][:, trajectory])  # no corresponding value found in read_data_set_max.ipynb
