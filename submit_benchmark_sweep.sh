@@ -46,6 +46,8 @@ TOL_CONFIGS=(
 # ---- Walltime (adjust if needed) -------------------------------------
 WALLTIME="05:00:00"
 
+LOG_DIR="/home/581/mr9897/RADIv2_Hinne/logs"
+
 # ---- Submit ----------------------------------------------------------
 total=0
 for ic in "${IC_FILES[@]}"; do
@@ -77,7 +79,7 @@ for ic in "${IC_FILES[@]}"; do
                 echo "[DRY_RUN] qsub -N radi_${tag} -l ncpus=${ncpus} -l mem=${mem}GB -l walltime=${WALLTIME} -v NCPUS=${ncpus},MEM=${mem},IC_FILE=${ic},ABSTOL=${abstol},RELTOL=${reltol},RUN_TAG=${tag} /home/581/mr9897/RADIv2_Hinne/benchmarking_sweep_run.sh"
             else
                 echo "Submitting: $tag"
-                echo "qsub -P jk72 -q normal -l walltime=${WALLTIME} -l ncpus=${ncpus} -l mem=${mem}GB -l storage=scratch/zn44+scratch/jk72 -N radi_${tag} -v "IC_FILE=${ic},ABSTOL=${abstol},RELTOL=${reltol},RUN_TAG=${tag}" "/home/581/mr9897/RADIv2_Hinne/benchmarking_sweep_run.sh""
+                echo "qsub -P jk72 -q normal -l walltime=${WALLTIME} -l ncpus=${ncpus} -l mem=${mem}GB -l storage=scratch/zn44+scratch/jk72 -o "${LOG_DIR}/" -N radi_${tag} -v "IC_FILE=${ic},ABSTOL=${abstol},RELTOL=${reltol},RUN_TAG=${tag}" "/home/581/mr9897/RADIv2_Hinne/benchmarking_sweep_run.sh""
                 echo "qsub \
                     -P jk72 \
                     -q normal \
@@ -85,6 +87,7 @@ for ic in "${IC_FILES[@]}"; do
                     -l ncpus=${ncpus} \
                     -l mem=${mem}GB \
                     -l storage=scratch/zn44+scratch/jk72 \
+                    -o "${LOG_DIR}/"\
                     -N radi_${tag} \
                     -v "IC_FILE=${ic},ABSTOL=${abstol},RELTOL=${reltol},RUN_TAG=${tag}" \
                     "/home/581/mr9897/RADIv2_Hinne/benchmarking_sweep_run.sh" "
@@ -95,6 +98,7 @@ for ic in "${IC_FILES[@]}"; do
                     -l ncpus=${ncpus} \
                     -l mem=${mem}GB \
                     -l storage=scratch/zn44+scratch/jk72 \
+                    -o "${LOG_DIR}/"\
                     -N radi_${tag} \
                     -v "IC_FILE=${ic},ABSTOL=${abstol},RELTOL=${reltol},RUN_TAG=${tag}" \
                     "/home/581/mr9897/RADIv2_Hinne/benchmarking_sweep_run.sh"
