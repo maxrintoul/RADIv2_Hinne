@@ -52,7 +52,7 @@ trajectories = [1]
 
 ## Define perturbation run duration
 perturbation_duration = 1.0 # years
-save_dt = 1/365/24/60*6 # 0.001 # save every 0.01 yr. Adjust as needed.
+save_dt = 1/365/24 # Save every hour # 0.001 # save every 0.01 yr. Adjust as needed.
 flux_saveat = 0.0:save_dt:perturbation_duration # save
 
 ## Define function to write new input files for perturbation runs, using steady state output as initial conditions and new TA values for perturbations
