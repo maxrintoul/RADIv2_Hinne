@@ -3,7 +3,7 @@
 using MAT
 using Printf
 
-ss_filename = "/Users/maxrintoul/repos/RADIv2_09_03_2026/gadi_output/sols_all_20260513_015038_212_job168217606-gadi-pbs_pid161303_3dc0fc70-cc51-4fb1-81de-48cdf8fbb169.mat";
+ss_filename = "/Users/maxrintoul/repos/RADIv2_09_03_2026/gadi_output/sols_all_20260709_143335_563_job173411405-gadi-pbs_pid2430700_a62f670c-a918-43e5-ac0a-f5d989be5888.mat";
 # ss_filename = "/Users/maxrintoul/repos/RADIv2_09_03_2026/sols_all_20260708_123606_749_jobnojid_pid96014_0c1e427e-ed26-4226-89d9-57aa1cfbb8a6.mat";
 model_output = matread(ss_filename);
 
@@ -31,7 +31,7 @@ final_output_dict = Dict(var => fin_sols[i, :, :] for (i, var) in enumerate(var_
 ## Get model inputs for each run
 
 # Input values for steady state run
-ss_input_filename = "/Users/maxrintoul/repos/RADIv2_09_03_2026/gadi_output/input_data_20260513_003622.mat";
+ss_input_filename = "/Users/maxrintoul/repos/RADIv2_09_03_2026/gadi_output/input_data_20260709_131447.mat";
 # ss_input_filename = "/Users/maxrintoul/repos/RADIv2_09_03_2026/input_data_20260708_123457.mat";
 steady_state_input = matread(ss_input_filename);
 
@@ -45,14 +45,14 @@ dalk_perturbations = dalk_perturbations = collect(0:50:1000) .* 1e-6 # .- base_d
 dalk_vals = Float64.(base_dalk .+ dalk_perturbations)
 
 ## Trajectories to perform perturbations on
-trajectories = 10:36 # 1:9
+trajectories = 1 # 1:9
 
 # dalk_vals = steady_state_input["water_values"]["dalk_w"] .+ (0.0) # :0.0001:0.0005) # example perturbation values for alkalinity in overlying water column (50% decrease, no change, 50% increase)
 # dalk_vals = collect(dalk_vals)
 
 ## Define perturbation run duration
 perturbation_duration = 30.0 # years
-save_dt = 1 # Save every hour # 0.001 # save every 0.01 yr. Adjust as needed.
+save_dt = 1.0 # Save every hour # 0.001 # save every 0.01 yr. Adjust as needed.
 flux_saveat = 0.0:save_dt:perturbation_duration # save
 
 ## Define function to write new input files for perturbation runs, using steady state output as initial conditions and new TA values for perturbations
